@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  148K dict
+  144K dict
 
   $ cdict-tool query dict type module function value match
   found: "type" freq=2070
@@ -23,7 +23,7 @@
   $ cdict-tool stats words.combined
   Parsing "words.combined"
   Generating a 7984 words dictionary.
-  Nodes: 15769
+  Nodes: 16448
   Leaf nodes: 5923
   Branch nodes: 3888
     With leaf: 2061
@@ -35,8 +35,8 @@
       |  7: 27   |  8: 7    |  9: 15   | 10: 15   | 11: 8    | 12: 5   
       | 13: 8    | 14: 1    | 15: 6    | 16: 3    | 17: 4    | 18: 1   
       | 19: 2    | 20: 1    | 21: 2    | 26: 1    | 27: 1    |
-  Prefix nodes: 5958
+  Prefix nodes: 6637
     Followed by:
-    | Branches: 1403 | Leaf: 3844 | Prefix: 711  |
+    | Branches: 1403 | Leaf: 3844 | Prefix: 1390 |
     With size:
-    |  1: 2145 |  2: 1600 |  3: 963  |  4: 1250 |
+    |  1: 2464 |  2: 1749 |  3: 2424 |
