@@ -1,0 +1,13 @@
+(library
+ (public_name cdict)
+ (name cdict)
+ (modules cdict)
+ (libraries cdict.c)
+ (foreign_stubs
+  (language c)
+  (names cdict_stubs)))
+
+(library
+ (public_name cdict.writer)
+ (name cdict_writer)
+ (modules cdict_writer))

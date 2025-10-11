@@ -1,0 +1,4 @@
+(test
+ (name unit)
+ (package cdict)
+ (libraries cdict cdict.writer hxd.string))
