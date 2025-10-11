@@ -28,6 +28,7 @@ typedef enum
 {
   LEAF = 0b001,
   BRANCHES = 0b000,
+  BRANCHES_WITH_LEAF = 0b011,
   PREFIX = 0b010,
 } kind_t;
 
@@ -45,15 +46,15 @@ dictionary.
 
 #define LEAF_DATA(PTR) ((PTR) >> 3)
 
-/** BRANCHES nodes (size = 8 bytes + array)
+/** BRANCHES nodes (size = 4 bytes + array)
 
-A branching node that consumes 8 bits from the query.
+A branching node that consumes 1 byte from the query.
 
 The 'branches' fields is an array of node pointers indexed by the first byte of
 the query, minus the 'low' value.
 Node pointers are NULL when the queried word is not in the dictionary.
 If the first byte of the query is greater than 'low + length - 1'
-and 'has_next' is 1, the query should be tried again on the 8-bits node at
+and 'has_next' is 1, the query should be tried again on the branches node at
 the offset BRANCHES_NEXT(B). However, if 'has_next' is 0, no prefix higher than
 'low + length - 1' are present in the dictionary.
 
@@ -64,9 +65,6 @@ array, as well as inside the array if that reduces the total size.
 
 typedef struct
 {
-  ptr_or_null_t leaf;
-  /** A pointer to a leaf if a word is present in the dictionary at the current
-      location, or 0. Pointers to other kind of nodes are not allowed. */
   char low; /** Lowest value represented by the node. */
   char length; /** Length of the 'branches' array in number of pointers. */
   char has_next; /** Whether a branches node follow after this one. */
@@ -79,6 +77,19 @@ typedef struct
 /** Offset to the next [branches_t] node when [has_next]. Argument [B_PTR]
     appears twice. */
 #define BRANCHES_NEXT(B_PTR) (((void*)(B_PTR)) + BRANCHES_SIZE(*(B_PTR)))
+
+/** BRANCHES WITH LEAF node (size = 4 bytes + branches node)
+
+A variant of the branches node with a leaf pointers. This node is treated as a
+leaf if it is encountered at the end of the query or a branches node otherwise.
+*/
+
+typedef struct
+{
+  ptr_t leaf;
+  /** A pointer to a leaf. Pointers to other kind of nodes are not allowed. */
+  branches_t b[];
+} branches_with_leaf_t;
 
 /** PREFIX nodes (size = 8 bytes)
 

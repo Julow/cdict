@@ -24,8 +24,6 @@ static ptr_or_null_t cdict_find_branches(void const *data, int32_t off,
     char const *word, char const *end)
 {
   branches_t const *b = data + off;
-  if (word == end)
-    return b->leaf;
   char c = *word;
   while (c >= b->low + b->length)
   {
@@ -39,6 +37,15 @@ static ptr_or_null_t cdict_find_branches(void const *data, int32_t off,
   if (next == 0)
     return 0;
   return cdict_find_node(data, next, word + 1, end);
+}
+
+static ptr_or_null_t cdict_find_branches_with_leaf(void const *data, int32_t off,
+    char const *word, char const *end)
+{
+  branches_with_leaf_t const *b = data + off;
+  if (word == end)
+    return b->leaf;
+  return cdict_find_branches(data, off + 4, word, end);
 }
 
 static ptr_or_null_t cdict_find_prefix(void const *data, int32_t off,
@@ -68,6 +75,7 @@ static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
   {
     case LEAF: return (word == end) ? ptr : 0;
     case BRANCHES: return cdict_find_branches(data, off, word, end);
+    case BRANCHES_WITH_LEAF: return cdict_find_branches_with_leaf(data, off, word, end);
     case PREFIX: return cdict_find_prefix(data, off, word, end);
     default: return 0;
   }
@@ -76,7 +84,8 @@ static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
 bool cdict_find(cdict_t const *dict, char const *word, int word_size,
     int *leaf)
 {
-  assert(sizeof(branches_t) == 8);
+  assert(sizeof(branches_t) == 4);
+  assert(sizeof(branches_with_leaf_t) == 4);
   assert(sizeof(prefix_t) == 8);
   ptr_or_null_t r = cdict_find_node(dict->data, dict->root_ptr, word,
       word + word_size);

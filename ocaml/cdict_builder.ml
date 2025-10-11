@@ -86,7 +86,7 @@ module Optimized = struct
     let split_cost =
       (* Branches node header + arbitrary value representing the runtime cost
          of traversing to an other node. *)
-      8 + 8
+      4 + 12
     in
     let branch_cost = 4 in
     split_cost / branch_cost
@@ -153,16 +153,18 @@ module Buf = struct
 end
 
 module Ptr = struct
-  type kind = [ `Leaf | `Prefix | `Branches ]
+  type kind = [ `Leaf | `Prefix | `Branches | `Branches_with_leaf ]
   type t = Ptr of kind * int32
 
   let v kind ptr = Ptr (kind, Int32.of_int ptr)
   let v_leaf v = Ptr (`Leaf, Int32.(shift_left (of_int v) 3))
+  let offset (Ptr (_, p)) = Int32.to_int p
 
   let tag_of_kind = function
     | `Leaf -> 0b001l
     | `Prefix -> 0b010l
     | `Branches -> 0b000l
+    | `Branches_with_leaf -> 0b011l
 
   let to_int32 (Ptr (kind, ptr)) =
     if not Int32.(logand ptr 0b111l = 0l) then
@@ -206,11 +208,13 @@ module Writer = struct
     | Optimized.Leaf leaf ->
         (* Leaf nodes cannot be misaligned because pointers to it must be
            written in the dictionary (the pointer is the leaf data). *)
-        if Option.is_some align then failwith "Misaligned leaf node";
+        if align = Some false then failwith "Misaligned leaf node";
         alloc_leaf leaf
     | Prefix (p, next) -> write_prefix_node ?align b ~alloc_leaf nodes p next
-    | Branches { leaf; branches } ->
-        write_branches_node ?align b ~alloc_leaf nodes leaf branches
+    | Branches { leaf = Some leaf; branches } ->
+        write_branches_with_leaf_node ?align b ~alloc_leaf nodes leaf branches
+    | Branches { leaf = None; branches } ->
+        write_branches_node ?align b ~alloc_leaf nodes branches
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
     let off = alloc ?align b 8 in
@@ -222,7 +226,7 @@ module Writer = struct
     Ptr.w b (off + 4) next;
     Ptr.v `Prefix off
 
-  and write_branches_node ?align b ~alloc_leaf nodes leaf brs =
+  and write_branches_node ?align b ~alloc_leaf nodes brs =
     let min_value, max_value =
       match brs.b_branches with
       | [] -> (0, 0)
@@ -235,13 +239,12 @@ module Writer = struct
        ensure that they are continuous. Disable alignment to avoid inserting
        padding before a 'next' branches node. Alignment is done explicitly in
        [write_node]. *)
-    let off = alloc ?align b (8 + (len * 4)) in
-    let branch_off n = off + 8 + (n * 4) in
+    let off = alloc ?align b (4 + (len * 4)) in
+    let branch_off n = off + 4 + (n * 4) in
     let has_next =
       match brs.b_next with
       | Some next ->
-          ignore
-            (write_branches_node ~align:false b ~alloc_leaf nodes None next);
+          ignore (write_branches_node ~align:false b ~alloc_leaf nodes next);
           1
       | None -> 0
     in
@@ -250,15 +253,17 @@ module Writer = struct
         let c = Char.code c in
         Ptr.w b (branch_off (c - min_value)) (write_node b ~alloc_leaf nodes id))
       brs.b_branches;
-    let leaf =
-      match leaf with Some leaf -> Ptr.to_int32 (alloc_leaf leaf) | None -> 0l
-    in
-    w_int32 b off leaf;
-    (* Tagged pointer or NULL *)
-    w_int8 b (off + 4) min_value;
-    w_int8 b (off + 5) len;
-    w_int8 b (off + 6) has_next;
+    w_int8 b off min_value;
+    w_int8 b (off + 1) len;
+    w_int8 b (off + 2) has_next;
     Ptr.v `Branches off
+
+  and write_branches_with_leaf_node ?align b ~alloc_leaf nodes leaf brs =
+    let off = alloc ?align b 4 in
+    let next_off = write_branches_node ~align:false b ~alloc_leaf nodes brs in
+    assert (Ptr.offset next_off = off + 4);
+    Ptr.w b off (alloc_leaf leaf);
+    Ptr.v `Branches_with_leaf off
 
   let write_tree b ~encode_leaf nodes =
     let alloc_leaf leaf = Ptr.v_leaf (encode_leaf leaf) in
