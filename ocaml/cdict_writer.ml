@@ -277,3 +277,63 @@ let to_string tree ~encode_leaf =
 let output tree ~encode_leaf out_chan =
   let b = to_buf tree ~encode_leaf in
   Buf.output out_chan b
+
+let hist (type a) to_s key ppf lst =
+  let module M = Map.Make (struct
+    type t = a
+
+    let compare = compare
+  end) in
+  Format.fprintf ppf "@[<hov 0>|";
+  List.fold_left
+    (fun h e ->
+      let k = key e in
+      let n = try M.find k h + 1 with Not_found -> 1 in
+      M.add k n h)
+    M.empty lst
+  |> M.iter (fun k c -> Format.fprintf ppf " %2s: %-4d@ |" (to_s k) c);
+  Format.fprintf ppf "@]"
+
+let hist_int key ppf lst = hist string_of_int key ppf lst
+let hist_str key ppf lst = hist Fun.id key ppf lst
+
+let stats ppf tree =
+  let open Optimized in
+  let count f lst =
+    List.fold_left (fun n e -> if f e then n + 1 else n) 0 lst
+  in
+  let rec branches_ranges b =
+    b.b_branches :: Option.fold ~none:[] ~some:branches_ranges b.b_next
+  in
+  let nodes = IdMap.fold (fun _ n acc -> n :: acc) tree [] in
+  Format.fprintf ppf "Nodes: %d@\nLeaf nodes: %d@\n" (List.length nodes)
+    (count (function Leaf _ -> true | _ -> false) nodes);
+  let branches =
+    List.filter_map
+      (function Branches b -> Some (b.leaf, b.branches) | _ -> None)
+      nodes
+  in
+  let ranges = List.concat_map (fun (_, b) -> branches_ranges b) branches in
+  Format.fprintf ppf
+    "@[<v 2>Branch nodes: %d@ With leaf: %d@ With 'next' nodes:@ %a@ @[<v \
+     2>Ranges: %d:@ %a@]@]@\n"
+    (List.length branches)
+    (count (fun (l, _) -> Option.is_some l) branches)
+    (hist_int (fun (_, b) -> List.length (branches_ranges b)))
+    branches (List.length ranges) (hist_int List.length) ranges;
+  let prefixes =
+    List.filter_map
+      (function Prefix (p, id) -> Some (p, id) | _ -> None)
+      nodes
+  in
+  Format.fprintf ppf
+    "@[<v 2>Prefix nodes: %d@ Followed by:@ %a@ With size:@ %a@]@\n"
+    (List.length prefixes)
+    (hist_str (fun (_, next) ->
+         match IdMap.find next tree with
+         | Prefix _ -> "Prefix"
+         | Branches _ -> "Branches"
+         | Leaf _ -> "Leaf"))
+    prefixes
+    (hist_int (fun (p, _) -> String.length p))
+    prefixes

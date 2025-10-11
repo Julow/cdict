@@ -19,3 +19,24 @@
   not found: "defensive"
   not found: "coding"
   [4]
+
+  $ cdict-tool stats words.combined
+  Parsing "words.combined"
+  Generating a 7984 words dictionary.
+  Nodes: 15769
+  Leaf nodes: 5923
+  Branch nodes: 3888
+    With leaf: 2061
+    With 'next' nodes:
+    |  1: 1957 |  2: 1623 |  3: 267  |  4: 25   |  5: 9    |  6: 4   
+    |  7: 3    |
+    Ranges: 6194:
+      |  1: 4333 |  2: 1262 |  3: 314  |  4: 86   |  5: 58   |  6: 34  
+      |  7: 27   |  8: 7    |  9: 15   | 10: 15   | 11: 8    | 12: 5   
+      | 13: 8    | 14: 1    | 15: 6    | 16: 3    | 17: 4    | 18: 1   
+      | 19: 2    | 20: 1    | 21: 2    | 26: 1    | 27: 1    |
+  Prefix nodes: 5958
+    Followed by:
+    | Branches: 1403 | Leaf: 3844 | Prefix: 711  |
+    With size:
+    |  1: 2145 |  2: 1600 |  3: 963  |  4: 1250 |

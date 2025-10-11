@@ -13,3 +13,6 @@ val output : 'a t -> encode_leaf:('a -> int) -> Out_channel.t -> unit
 
 val to_string : 'a t -> encode_leaf:('a -> int) -> string
 (** Like [output] but write into a string in memory. *)
+
+val stats : Format.formatter -> 'a t -> unit
+(** Print various stats for debugging and testing purposes. *)

@@ -46,9 +46,18 @@ let cmd_query =
   in
   Cmd.(v (info "query" ~doc)) term
 
+let cmd_stats =
+  let arg_inputs =
+    let doc = "The same files that the 'build' command accepts." in
+    Arg.(value & pos_all file [] & info ~doc [])
+  in
+  let term = Term.(const Stats.main $ arg_inputs) in
+  let doc = "Build a dictionary and print stats about its structure." in
+  Cmd.(v (info "stats" ~doc)) term
+
 let cmd =
   let doc = "Build dictionaries from libcdict." in
   let info = Cmd.info "cdict-tool" ~version:"%%VERSION%%" ~doc in
-  Cmd.group info [ cmd_build; cmd_query ]
+  Cmd.group info [ cmd_build; cmd_query; cmd_stats ]
 
 let () = exit (Cmd.eval cmd)
