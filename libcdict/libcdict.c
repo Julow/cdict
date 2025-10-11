@@ -10,7 +10,7 @@ cdict_t cdict_of_string(char const *data, int size)
 {
   assert(sizeof(branches_t) == 4);
   assert(sizeof(branches_with_leaf_t) == 4);
-  assert(sizeof(prefix_t) == 8);
+  assert(sizeof(prefix_t) == 4);
   assert(sizeof(btree_t) == 8);
   assert(sizeof(btree_with_leaf_t) == 4);
   header_t const *h = (void const*)data;
@@ -22,8 +22,14 @@ cdict_t cdict_of_string(char const *data, int size)
   return dict;
 }
 
-static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
+static ptr_or_null_t cdict_find_node_(void const *data, int32_t off, kind_t kind,
     char const *word, char const *end);
+
+static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
+    char const *word, char const *end)
+{
+  return cdict_find_node_(data, PTR_OFFSET(ptr), PTR_KIND(ptr), word, end);
+}
 
 static ptr_or_null_t cdict_find_branches(void const *data, int32_t off,
     char const *word, char const *end)
@@ -64,12 +70,15 @@ static ptr_or_null_t cdict_find_prefix(void const *data, int32_t off,
     if (word == end) return 0;
     if (*word != p) return 0;
     word++;
-    if (i == 4) break;
+    if (i == 3) break;
     p = node->prefix[i];
     if (p == 0) break;
     i++;
   }
-  return cdict_find_node(data, node->next, word, end);
+  if (node->next_kind == LEAF)
+    return (word == end) ? node->leaf[0] : 0;
+  else
+    return cdict_find_node_(data, off + sizeof(prefix_t), node->next_kind, word, end);
 }
 
 static ptr_or_null_t cdict_find_btree(void const *data, int32_t off,
@@ -108,13 +117,12 @@ static ptr_or_null_t cdict_find_btree_with_leaf(void const *data, int32_t off,
   return cdict_find_btree(data, off + sizeof(btree_with_leaf_t), word, end);
 }
 
-static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
+static ptr_or_null_t cdict_find_node_(void const *data, int32_t off, kind_t kind,
     char const *word, char const *end)
 {
-  int32_t off = PTR_OFFSET(ptr);
-  switch (PTR_KIND(ptr))
+  switch (kind)
   {
-    case LEAF: return (word == end) ? ptr : 0;
+    case LEAF: return (word == end) ? (off | (int32_t)kind) : 0;
     case BRANCHES: return cdict_find_branches(data, off, word, end);
     case BRANCHES_WITH_LEAF: return cdict_find_branches_with_leaf(data, off, word, end);
     case PREFIX: return cdict_find_prefix(data, off, word, end);

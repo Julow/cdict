@@ -93,24 +93,30 @@ typedef struct
   branches_t b[];
 } branches_with_leaf_t;
 
-/** PREFIX nodes (size = 8 bytes)
+/** PREFIX nodes (size = 4 bytes)
 
-A single branch, consuming up to a 4 bytes from the query.
+A single branch, consuming up to 3 bytes from the query.
 The 'prefix' field is interpreted as follow:
 The first byte is always part of the prefix. The next bytes are only part of
 the prefix if they are not NUL, (where XX can be anything, including 0):
-XX 00 00 00  A 1 byte prefix
-XX ++ 00 00  A 2 byte prefix
-XX ++ ++ 00  A 3 byte prefix
-XX ++ ++ ++  A 4 byte prefix
+XX 00 00  A 1 byte prefix
+XX ++ 00  A 2 byte prefix
+XX ++ ++  A 3 byte prefix
 This means that a word containing a long string of NUL byte is very
 inefficiently encoded.
+
+The 'next_kind' field is interpreted as the kind of the node that follows, it's
+a value of type 'kind_t'. The node that follows starts just after the prefix
+node.
+
+If 'next_kind' is LEAF, what follows is the pointer to the leaf node instead.
 */
 
 typedef struct
 {
-  char prefix[4];
-  ptr_t next;
+  char prefix[3];
+  char next_kind;
+  ptr_t leaf[]; /** Present only if 'next_kind = LEAF'. */
 } prefix_t;
 
 /** BTREE nodes (size = 8 bytes to 40 bytes)

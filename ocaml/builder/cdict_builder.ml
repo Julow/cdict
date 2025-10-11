@@ -34,6 +34,8 @@ module Optimized = struct
   (** Encode a trie into a form closer to libcdict's format, taking advantages
       of possible optimisations. *)
 
+  let prefix_node_max_length = 3
+
   module Id : sig
     type t = private int
 
@@ -78,7 +80,7 @@ module Optimized = struct
     b.b_branches :: Option.fold ~none:[] ~some:branches_to_list b.b_next
 
   let rec fold_prefix prefix trie =
-    if String.length prefix >= 4 then (prefix, trie)
+    if String.length prefix >= prefix_node_max_length then (prefix, trie)
     else
       match trie with
       | { Trie.leaf = None; branches = [ (c, next) ] } ->
@@ -212,6 +214,8 @@ module Ptr = struct
     | `Btree -> 0b100l
     | `Btree_with_leaf -> 0b101l
 
+  let tag (Ptr (kind, _)) = Int32.to_int (tag_of_kind kind)
+
   let to_int32 (Ptr (kind, ptr)) =
     if not Int32.(logand ptr 0b111l = 0l) then
       failwith "Writing misaligned pointer";
@@ -268,13 +272,22 @@ module Writer = struct
         write_btree_node ?align b ~alloc_leaf nodes labels branches
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
-    let off = alloc ?align b 8 in
-    let next = write_node b ~alloc_leaf nodes next in
-    assert (String.length p <= 4);
+    let off = alloc ?align b 4 in
+    (* Special representation when 'next' is a Leaf node. *)
+    let next_ptr =
+      match Optimized.find next nodes with
+      | Optimized.Leaf leaf ->
+          let leaf_ptr_off = alloc ~align:false b 4 in
+          let leaf_ptr = alloc_leaf leaf in
+          Ptr.w b leaf_ptr_off leaf_ptr;
+          leaf_ptr
+      | _ -> write_node ~align:false b ~alloc_leaf nodes next
+    in
+    assert (String.length p <= Optimized.prefix_node_max_length);
     for i = 0 to String.length p - 1 do
       w_int8 b (off + i) (Char.code p.[i])
     done;
-    Ptr.w b (off + 4) next;
+    w_int8 b (off + Optimized.prefix_node_max_length) (Ptr.tag next_ptr);
     Ptr.v `Prefix off
 
   and write_branches_node ?align b ~alloc_leaf nodes brs =
