@@ -8,9 +8,11 @@
 
 cdict_t cdict_of_string(char const *data, int size)
 {
+  header_t const *h = (void const*)data;
   cdict_t dict = {
     .data = data,
-    .size = size
+    .size = size,
+    .root_ptr = h->root_ptr
   };
   return dict;
 }
@@ -76,7 +78,8 @@ bool cdict_find(cdict_t const *dict, char const *word, int word_size,
 {
   assert(sizeof(branches_t) == 8);
   assert(sizeof(prefix_t) == 8);
-  ptr_or_null_t r = cdict_find_branches(dict->data, 0, word, word + word_size);
+  ptr_or_null_t r = cdict_find_node(dict->data, dict->root_ptr, word,
+      word + word_size);
   if (r == 0 || PTR_KIND(r) != LEAF)
     return false;
   if (leaf != NULL)

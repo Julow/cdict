@@ -99,3 +99,13 @@ typedef struct
   char prefix[4];
   ptr_t next;
 } prefix_t;
+
+/** Dictionary header (size = 4 bytes + 4 bytes of padding)
+
+Located at the beginning of the dictionary.
+*/
+
+typedef struct
+{
+  ptr_t root_ptr;
+} header_t;

@@ -262,7 +262,10 @@ module Writer = struct
 
   let write_tree b ~encode_leaf nodes =
     let alloc_leaf leaf = Ptr.v_leaf (encode_leaf leaf) in
-    ignore (write_node b ~alloc_leaf nodes Optimized.Id.zero)
+    let header_off = alloc b 4 in
+    assert (header_off = 0);
+    let root_ptr = write_node b ~alloc_leaf nodes Optimized.Id.zero in
+    Ptr.w b header_off root_ptr
 end
 
 let to_buf tree ~encode_leaf =
