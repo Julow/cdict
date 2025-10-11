@@ -2,4 +2,4 @@
  (name main)
  (public_name cdict-tool)
  (package cdict-tool)
- (libraries cmdliner cdict cdict.writer aosp_parser))
+ (libraries cmdliner cdict cdict.builder aosp_parser))

@@ -23,16 +23,16 @@ let parse_file fname =
   | ".combined" -> parse_aosp_combined ~fname
   | _ -> parse_newline_separated ~fname
 
-let parse_files_into_cdict_writer inputs =
+let parse_files_into_cdict_builder inputs =
   let words = List.concat_map parse_file inputs in
   Printf.printf "Generating a %d words dictionary.\n%!" (List.length words);
-  Cdict_writer.of_list words
+  Cdict_builder.of_list words
 
 let main output inputs =
   try
-    let d = parse_files_into_cdict_writer inputs in
+    let d = parse_files_into_cdict_builder inputs in
     Out_channel.with_open_bin output (fun out_chan ->
-        Cdict_writer.output d ~encode_leaf out_chan);
+        Cdict_builder.output d ~encode_leaf out_chan);
     Printf.printf "Done.\n%!"
   with Failure msg ->
     Printf.eprintf "Error: %s\n%!" msg;

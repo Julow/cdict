@@ -8,6 +8,6 @@
   (names cdict_stubs)))
 
 (library
- (public_name cdict.writer)
- (name cdict_writer)
- (modules cdict_writer))
+ (public_name cdict.builder)
+ (name cdict_builder)
+ (modules cdict_builder))

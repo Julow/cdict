@@ -3,8 +3,8 @@ let fail fmt = Format.kasprintf failwith fmt
 let create words =
   let words = List.mapi (fun i w -> (w, i)) words in
   let encode_leaf i = i in
-  let w = Cdict_writer.of_list words in
-  let data = Cdict_writer.to_string w ~encode_leaf in
+  let w = Cdict_builder.of_list words in
+  let data = Cdict_builder.to_string w ~encode_leaf in
   (* Hxd_string.pp Hxd.default Format.err_formatter data; *)
   (* Format.pp_print_flush Format.err_formatter (); *)
   Cdict.of_string data
