@@ -1,52 +1,15 @@
-type leaf = { freq : int }
-
-let encode_leaf l = l.freq
-
-let parse_aosp_combined ~fname =
-  let open Aosp_parser in
-  let wordlist = In_channel.with_open_text fname (parse ~fname) in
-  List.map (fun w -> (w.w, { freq = w.w_freq })) wordlist.words
-
-let parse_newline_separated ~fname =
-  let wordlist = In_channel.(with_open_text fname input_lines) in
-  let counts = Hashtbl.create (List.length wordlist) in
-  List.iter
-    (fun w ->
-      let c = try Hashtbl.find counts w with Not_found -> 0 in
-      Hashtbl.replace counts w (c + 1))
-    wordlist;
-  Hashtbl.fold (fun w freq acc -> (w, { freq }) :: acc) counts []
-
-let parse_file fname =
-  Printf.printf "Parsing %S\n%!" fname;
-  match Filename.extension fname with
-  | ".combined" -> parse_aosp_combined ~fname
-  | _ -> parse_newline_separated ~fname
-
-let main output inputs =
-  try
-    let words = List.concat_map parse_file inputs in
-    Printf.printf "Generating a %d words dictionary.\n%!" (List.length words);
-    let d = Cdict_writer.of_list words in
-    Out_channel.with_open_bin output (fun out_chan ->
-        Cdict_writer.output d ~encode_leaf out_chan);
-    Printf.printf "Done.\n%!"
-  with Failure msg ->
-    Printf.eprintf "Error: %s\n%!" msg;
-    exit 1
-
 open Cmdliner
 
-let arg_output =
-  let doc = "Output file" in
-  Arg.(required & opt (some string) None & info ~doc [ "o" ])
-
-let arg_inputs =
-  let doc = "Input files" in
-  Arg.(value & pos_all file [] & info ~doc [])
-
-let cmd =
-  let term = Term.(const main $ arg_output $ arg_inputs) in
+let cmd_build =
+  let arg_output =
+    let doc = "Output file." in
+    Arg.(required & opt (some string) None & info ~doc [ "o" ])
+  in
+  let arg_inputs =
+    let doc = "Input files." in
+    Arg.(value & pos_all file [] & info ~doc [])
+  in
+  let term = Term.(const Build.main $ arg_output $ arg_inputs) in
   let doc =
     "Compile dictionaries for libcdict from text files. Supported formats are:\n\n\
     \  - AOSP word lists, if the file extension is .combined.\n\
@@ -55,7 +18,37 @@ let cmd =
      The leaves of contain the frequency of the word as specified in the AOSP \
      word list or counted in the plain text word list."
   in
+  Cmd.(v (info "build" ~doc)) term
+
+let cmd_query =
+  let opt_quiet =
+    let doc = "Suppress output." in
+    Arg.(value & flag & info ~doc [ "q" ])
+  in
+  let opt_from_file =
+    let doc = "Read the words to query from a file." in
+    Arg.(value & opt (some file) None & info ~doc [ "from-file" ])
+  in
+  let arg_dict =
+    let doc = "Dictionary to query." in
+    Arg.(required & pos 0 (some file) None & info ~doc ~docv:"DICT" [])
+  in
+  let arg_queries =
+    let doc = "Words to look for in the dictionary." in
+    Arg.(value & pos_right 0 string [] & info ~doc ~docv:"WORDS" [])
+  in
+  let term =
+    Term.(const Query.main $ opt_quiet $ opt_from_file $ arg_dict $ arg_queries)
+  in
+  let doc =
+    "Query the specified words in the given dictionary. Exits with status \
+     equal to the number of words not found in the dictionary."
+  in
+  Cmd.(v (info "query" ~doc)) term
+
+let cmd =
+  let doc = "Build dictionaries from libcdict." in
   let info = Cmd.info "cdict-tool" ~version:"%%VERSION%%" ~doc in
-  Cmd.v info term
+  Cmd.group info [ cmd_build; cmd_query ]
 
 let () = exit (Cmd.eval cmd)
