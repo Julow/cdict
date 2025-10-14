@@ -1,13 +1,7 @@
 (library
  (public_name cdict)
  (name cdict)
- (modules cdict)
  (libraries cdict.c)
  (foreign_stubs
   (language c)
   (names cdict_stubs)))
-
-(library
- (public_name cdict.builder)
- (name cdict_builder)
- (modules cdict_builder))
