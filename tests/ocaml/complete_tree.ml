@@ -23,5 +23,4 @@ let () =
     test_of_sorted_list lst;
     match lst with _ :: tl -> loop tl | [] -> ()
   in
-  loop (List.init 11 (fun i -> Char.chr (Char.code '0' + i)))
-(* loop (List.init 31 (fun i -> Char.chr (Char.code '0' + i))) *)
+  loop (List.init 31 (fun i -> Char.chr (Char.code '0' + i)))

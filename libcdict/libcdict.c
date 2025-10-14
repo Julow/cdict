@@ -8,6 +8,11 @@
 
 cdict_t cdict_of_string(char const *data, int size)
 {
+  assert(sizeof(branches_t) == 4);
+  assert(sizeof(branches_with_leaf_t) == 4);
+  assert(sizeof(prefix_t) == 8);
+  assert(sizeof(btree_t) == 8);
+  assert(sizeof(btree_with_leaf_t) == 4);
   header_t const *h = (void const*)data;
   cdict_t dict = {
     .data = data,
@@ -71,8 +76,6 @@ static ptr_or_null_t cdict_find_btree(void const *data, int32_t off,
     char const *word, char const *end)
 {
   btree_t const *b = data + off;
-  if (word == end)
-    return b->leaf;
   char k = *word;
   // This node cannot match a NUL byte because it is used in the encoding of
   // the tree.
@@ -94,6 +97,17 @@ static ptr_or_null_t cdict_find_btree(void const *data, int32_t off,
   return 0;
 }
 
+static ptr_or_null_t cdict_find_btree_with_leaf(void const *data, int32_t off,
+    char const *word, char const *end)
+{
+  if (word == end)
+  {
+    btree_with_leaf_t const *b = data + off;
+    return b->leaf;
+  }
+  return cdict_find_btree(data, off + sizeof(btree_with_leaf_t), word, end);
+}
+
 static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
     char const *word, char const *end)
 {
@@ -105,6 +119,7 @@ static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
     case BRANCHES_WITH_LEAF: return cdict_find_branches_with_leaf(data, off, word, end);
     case PREFIX: return cdict_find_prefix(data, off, word, end);
     case BTREE: return cdict_find_btree(data, off, word, end);
+    case BTREE_WITH_LEAF: return cdict_find_btree_with_leaf(data, off, word, end);
     default: return 0;
   }
 }
@@ -112,9 +127,6 @@ static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
 bool cdict_find(cdict_t const *dict, char const *word, int word_size,
     int *leaf)
 {
-  assert(sizeof(branches_t) == 4);
-  assert(sizeof(branches_with_leaf_t) == 4);
-  assert(sizeof(prefix_t) == 8);
   ptr_or_null_t r = cdict_find_node(dict->data, dict->root_ptr, word,
       word + word_size);
   if (r == 0 || PTR_KIND(r) != LEAF)

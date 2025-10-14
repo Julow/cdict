@@ -31,6 +31,7 @@ typedef enum
   BRANCHES_WITH_LEAF = 0b011,
   PREFIX = 0b010,
   BTREE = 0b100,
+  BTREE_WITH_LEAF = 0b101,
 } kind_t;
 
 /** Partial cast to [kind_t]. */
@@ -120,6 +121,9 @@ corresponding pointer in 'next'.
 
 This node doesn't support NUL prefixes, finding a NUL in 'labels' means that
 the end of tree was reached.
+
+'btree_with_leaf_t' is a variant with a leaf attached, just like
+'branches_with_leaf_t'.
 */
 
 #define BTREE_NODE_LENGTH 8
@@ -127,9 +131,14 @@ the end of tree was reached.
 typedef struct
 {
   char labels[BTREE_NODE_LENGTH];
-  ptr_or_null_t leaf;
   ptr_t next[];
 } btree_t;
+
+typedef struct
+{
+  ptr_t leaf;
+  btree_t b[];
+} btree_with_leaf_t;
 
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 

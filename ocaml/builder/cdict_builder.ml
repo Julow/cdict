@@ -191,22 +191,26 @@ end
 
 module Ptr = struct
   type kind =
-    [ `Null | `Leaf | `Prefix | `Branches | `Branches_with_leaf | `Btree ]
+    [ `Leaf
+    | `Prefix
+    | `Branches
+    | `Branches_with_leaf
+    | `Btree
+    | `Btree_with_leaf ]
 
   type t = Ptr of kind * int32
 
   let v kind ptr = Ptr (kind, Int32.of_int ptr)
   let v_leaf v = Ptr (`Leaf, Int32.(shift_left (of_int v) 3))
-  let null = Ptr (`Null, 0l)
   let offset (Ptr (_, p)) = Int32.to_int p
 
   let tag_of_kind = function
-    | `Null -> 0l
     | `Leaf -> 0b001l
     | `Prefix -> 0b010l
     | `Branches -> 0b000l
     | `Branches_with_leaf -> 0b011l
     | `Btree -> 0b100l
+    | `Btree_with_leaf -> 0b101l
 
   let to_int32 (Ptr (kind, ptr)) =
     if not Int32.(logand ptr 0b111l = 0l) then
@@ -257,8 +261,11 @@ module Writer = struct
         write_branches_with_leaf_node ?align b ~alloc_leaf nodes leaf branches
     | Branches { leaf = None; branches } ->
         write_branches_node ?align b ~alloc_leaf nodes branches
-    | Btree { leaf; labels; branches } ->
-        write_btree_node ?align b ~alloc_leaf nodes leaf labels branches
+    | Btree { leaf = Some leaf; labels; branches } ->
+        write_btree_node_with_leaf ?align b ~alloc_leaf nodes leaf labels
+          branches
+    | Btree { leaf = None; labels; branches } ->
+        write_btree_node ?align b ~alloc_leaf nodes labels branches
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
     let off = alloc ?align b 8 in
@@ -309,15 +316,20 @@ module Writer = struct
     Ptr.w b off (alloc_leaf leaf);
     Ptr.v `Branches_with_leaf off
 
-  and write_btree_node ?align b ~alloc_leaf nodes leaf labels brs =
-    let off = alloc ?align b (12 + (Array.length brs * 4)) in
+  and write_btree_node_with_leaf ?align b ~alloc_leaf nodes leaf labels brs =
+    let off = alloc ?align b 4 in
+    let b_off = write_btree_node ~align:false b ~alloc_leaf nodes labels brs in
+    assert (Ptr.offset b_off = off + 4);
+    Ptr.w b off (alloc_leaf leaf);
+    Ptr.v `Btree_with_leaf off
+
+  and write_btree_node ?align b ~alloc_leaf nodes labels brs =
+    let off = alloc ?align b (8 + (Array.length brs * 4)) in
     w_str b off labels;
     Array.iteri
       (fun i n ->
-        Ptr.w b (off + 12 + (i * 4)) (write_node b ~alloc_leaf nodes n))
+        Ptr.w b (off + 8 + (i * 4)) (write_node b ~alloc_leaf nodes n))
       brs;
-    let leaf = Option.fold ~none:Ptr.null ~some:alloc_leaf leaf in
-    Ptr.w b (off + 8) leaf;
     Ptr.v `Btree off
 
   let write_tree b ~encode_leaf nodes =
