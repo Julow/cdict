@@ -67,6 +67,33 @@ static ptr_or_null_t cdict_find_prefix(void const *data, int32_t off,
   return cdict_find_node(data, node->next, word, end);
 }
 
+static ptr_or_null_t cdict_find_btree(void const *data, int32_t off,
+    char const *word, char const *end)
+{
+  btree_t const *b = data + off;
+  if (word == end)
+    return b->leaf;
+  char k = *word;
+  // This node cannot match a NUL byte because it is used in the encoding of
+  // the tree.
+  if (k == 0)
+    return 0;
+  int i = 0;
+  while (i < BTREE_NODE_LENGTH)
+  {
+    // [l] is NUL when stepping outside of the tree but [k] cannot be NUL so we
+    // don't have to check for this case.
+    char l = b->labels[i];
+    if (k == l)
+      return cdict_find_node(data, b->next[i], word + 1, end);
+    else if (k < l)
+      i = i * 2 + 1;
+    else
+      i = i * 2 + 2;
+  }
+  return 0;
+}
+
 static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
     char const *word, char const *end)
 {
@@ -77,6 +104,7 @@ static ptr_or_null_t cdict_find_node(void const *data, ptr_t ptr,
     case BRANCHES: return cdict_find_branches(data, off, word, end);
     case BRANCHES_WITH_LEAF: return cdict_find_branches_with_leaf(data, off, word, end);
     case PREFIX: return cdict_find_prefix(data, off, word, end);
+    case BTREE: return cdict_find_btree(data, off, word, end);
     default: return 0;
   }
 }

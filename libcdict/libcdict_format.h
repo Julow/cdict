@@ -30,6 +30,7 @@ typedef enum
   BRANCHES = 0b000,
   BRANCHES_WITH_LEAF = 0b011,
   PREFIX = 0b010,
+  BTREE = 0b100,
 } kind_t;
 
 /** Partial cast to [kind_t]. */
@@ -110,6 +111,25 @@ typedef struct
   char prefix[4];
   ptr_t next;
 } prefix_t;
+
+/** BTREE nodes (size = 8 bytes to 40 bytes)
+
+A branching node where the branch labels are stored in a binary search tree.
+First search for the current byte prefix into 'labels' then lookup the
+corresponding pointer in 'next'.
+
+This node doesn't support NUL prefixes, finding a NUL in 'labels' means that
+the end of tree was reached.
+*/
+
+#define BTREE_NODE_LENGTH 8
+
+typedef struct
+{
+  char labels[BTREE_NODE_LENGTH];
+  ptr_or_null_t leaf;
+  ptr_t next[];
+} btree_t;
 
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 

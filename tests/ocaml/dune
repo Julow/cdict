@@ -1,4 +1,4 @@
-(test
- (name unit)
+(tests
+ (names unit complete_tree)
  (package cdict)
- (libraries cdict cdict.builder hxd.string))
+ (libraries cdict cdict.builder))

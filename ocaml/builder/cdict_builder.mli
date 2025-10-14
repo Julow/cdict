@@ -16,3 +16,14 @@ val to_string : 'a t -> encode_leaf:('a -> int) -> string
 
 val stats : Format.formatter -> 'a t -> unit
 (** Print various stats for debugging and testing purposes. *)
+
+(**/**)
+
+(** Exposed for testing purposes *)
+
+module Complete_tree : sig
+  type 'a t
+
+  val of_sorted_list : 'a list -> 'a t
+  val to_array : 'a t -> 'a array
+end

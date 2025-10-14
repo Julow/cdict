@@ -35,7 +35,7 @@ module Optimized = struct
       of possible optimisations. *)
 
   module Id : sig
-    type t
+    type t = private int
 
     val zero : t
     val fresh : unit -> t
@@ -63,6 +63,7 @@ module Optimized = struct
   type 'a node =
     | Leaf of 'a
     | Branches of { leaf : 'a option; branches : 'a branches }
+    | Btree of { leaf : 'a option; labels : string; branches : Id.t array }
     | Prefix of string * Id.t  (** 1 to 4 bytes prefix *)
 
   type 'a t = 'a node IdMap.t
@@ -72,6 +73,9 @@ module Optimized = struct
     (IdMap.add id node ids, id)
 
   let find = IdMap.find
+
+  let rec branches_to_list b =
+    b.b_branches :: Option.fold ~none:[] ~some:branches_to_list b.b_next
 
   let rec fold_prefix prefix trie =
     if String.length prefix >= 4 then (prefix, trie)
@@ -91,6 +95,12 @@ module Optimized = struct
     let branch_cost = 4 in
     split_cost / branch_cost
 
+  (** The number of chained [branches] nodes at which a Btree node is
+      preferable. *)
+  let branches_btree_cutoff = 2
+
+  (** Split a branches node into a chain of smaller branches nodes with holes
+      removed. *)
   let rec optimise_branches left = function
     | ((a, _) as a') :: ((b, _) :: _ as tl)
       when Char.code b - Char.code a > branch_partition_cutoff ->
@@ -98,6 +108,27 @@ module Optimized = struct
         { b_branches = List.rev (a' :: left); b_next }
     | a' :: tl -> optimise_branches (a' :: left) tl
     | [] -> { b_branches = List.rev left; b_next = None }
+
+  (** Turn a branches node into a btree node if it's possible and would improve
+      performances. *)
+  let maybe_branches_to_btree leaf b =
+    let b = branches_to_list b in
+    let n_branches = List.length b in
+    let b = List.concat b in
+    let len = List.length b in
+    let has_nul_label = match b with ('\000', _) :: _ -> true | _ -> false in
+    (* Btree nodes can't have more than 8 branches and can't represent a NUL
+       label. Don't make a Btree node if the branches node has few 'next'
+       nodes. *)
+    if len > 8 || n_branches < branches_btree_cutoff || has_nul_label then None
+    else
+      let tree = Complete_tree.(to_array (of_sorted_list b)) in
+      let labels =
+        String.init 8 (fun i ->
+            if i < Array.length tree then fst tree.(i) else '\000')
+      in
+      let branches = Array.map snd tree in
+      Some (Btree { leaf; labels; branches })
 
   let rec node_of_trie ids = function
     | { Trie.leaf = Some leaf; branches = [] } -> add ids (Leaf leaf)
@@ -118,8 +149,13 @@ module Optimized = struct
         branches (ids, [])
     in
     assert (branches = List.sort compare branches);
-    let ids, branches = (ids, optimise_branches [] branches) in
-    (IdMap.add node_id (Branches { leaf; branches }) ids, node_id)
+    let branches = optimise_branches [] branches in
+    let node =
+      match maybe_branches_to_btree leaf branches with
+      | Some n -> n
+      | None -> Branches { leaf; branches }
+    in
+    (IdMap.add node_id node ids, node_id)
 
   let of_trie trie = fst (branches_of_trie Id.zero IdMap.empty trie)
 end
@@ -147,24 +183,30 @@ module Buf = struct
   module Open = struct
     let w_int32 b off i = Bytes.set_int32_le b.b off i
     let w_int8 b off i = Bytes.set_uint8 b.b off i
+    let w_str b off s = Bytes.blit_string s 0 b.b off (String.length s)
   end
 
   include Open
 end
 
 module Ptr = struct
-  type kind = [ `Leaf | `Prefix | `Branches | `Branches_with_leaf ]
+  type kind =
+    [ `Null | `Leaf | `Prefix | `Branches | `Branches_with_leaf | `Btree ]
+
   type t = Ptr of kind * int32
 
   let v kind ptr = Ptr (kind, Int32.of_int ptr)
   let v_leaf v = Ptr (`Leaf, Int32.(shift_left (of_int v) 3))
+  let null = Ptr (`Null, 0l)
   let offset (Ptr (_, p)) = Int32.to_int p
 
   let tag_of_kind = function
+    | `Null -> 0l
     | `Leaf -> 0b001l
     | `Prefix -> 0b010l
     | `Branches -> 0b000l
     | `Branches_with_leaf -> 0b011l
+    | `Btree -> 0b100l
 
   let to_int32 (Ptr (kind, ptr)) =
     if not Int32.(logand ptr 0b111l = 0l) then
@@ -215,6 +257,8 @@ module Writer = struct
         write_branches_with_leaf_node ?align b ~alloc_leaf nodes leaf branches
     | Branches { leaf = None; branches } ->
         write_branches_node ?align b ~alloc_leaf nodes branches
+    | Btree { leaf; labels; branches } ->
+        write_btree_node ?align b ~alloc_leaf nodes leaf labels branches
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
     let off = alloc ?align b 8 in
@@ -265,6 +309,17 @@ module Writer = struct
     Ptr.w b off (alloc_leaf leaf);
     Ptr.v `Branches_with_leaf off
 
+  and write_btree_node ?align b ~alloc_leaf nodes leaf labels brs =
+    let off = alloc ?align b (12 + (Array.length brs * 4)) in
+    w_str b off labels;
+    Array.iteri
+      (fun i n ->
+        Ptr.w b (off + 12 + (i * 4)) (write_node b ~alloc_leaf nodes n))
+      brs;
+    let leaf = Option.fold ~none:Ptr.null ~some:alloc_leaf leaf in
+    Ptr.w b (off + 8) leaf;
+    Ptr.v `Btree off
+
   let write_tree b ~encode_leaf nodes =
     let alloc_leaf leaf = Ptr.v_leaf (encode_leaf leaf) in
     let header_off = alloc b 4 in
@@ -310,9 +365,6 @@ let stats ppf tree =
   let count f lst =
     List.fold_left (fun n e -> if f e then n + 1 else n) 0 lst
   in
-  let rec branches_ranges b =
-    b.b_branches :: Option.fold ~none:[] ~some:branches_ranges b.b_next
-  in
   let nodes = IdMap.fold (fun _ n acc -> n :: acc) tree [] in
   Format.fprintf ppf "Nodes: %d@\nLeaf nodes: %d@\n" (List.length nodes)
     (count (function Leaf _ -> true | _ -> false) nodes);
@@ -321,13 +373,15 @@ let stats ppf tree =
       (function Branches b -> Some (b.leaf, b.branches) | _ -> None)
       nodes
   in
-  let ranges = List.concat_map (fun (_, b) -> branches_ranges b) branches in
+  let ranges =
+    List.concat_map (fun (_, b) -> Optimized.branches_to_list b) branches
+  in
   Format.fprintf ppf
     "@[<v 2>Branch nodes: %d@ With leaf: %d@ With 'next' nodes:@ %a@ @[<v \
      2>Ranges: %d:@ %a@]@]@\n"
     (List.length branches)
     (count (fun (l, _) -> Option.is_some l) branches)
-    (hist_int (fun (_, b) -> List.length (branches_ranges b)))
+    (hist_int (fun (_, b) -> List.length (Optimized.branches_to_list b)))
     branches (List.length ranges) (hist_int List.length) ranges;
   let prefixes =
     List.filter_map
@@ -341,7 +395,23 @@ let stats ppf tree =
          match IdMap.find next tree with
          | Prefix _ -> "Prefix"
          | Branches _ -> "Branches"
+         | Btree _ -> "Btree"
          | Leaf _ -> "Leaf"))
     prefixes
     (hist_int (fun (p, _) -> String.length p))
-    prefixes
+    prefixes;
+  let btrees =
+    List.filter_map
+      (function
+        | Btree { leaf; labels; branches } -> Some (leaf, labels, branches)
+        | _ -> None)
+      nodes
+  in
+  Format.fprintf ppf
+    "@[<v 2>Btree nodes: %d@ With leaf: %d@ With size:@ %a@]@\n"
+    (List.length btrees)
+    (count (fun (l, _, _) -> Option.is_some l) btrees)
+    (hist_int (fun (_, _, b) -> Array.length b))
+    btrees
+
+module Complete_tree = Complete_tree
