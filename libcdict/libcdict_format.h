@@ -34,9 +34,12 @@ typedef enum
   BTREE_WITH_LEAF = 0b101,
 } kind_t;
 
+#define PTR_KIND_MASK 0b111
+#define PTR_OFFSET_MASK ~0b111
+
 /** Partial cast to [kind_t]. */
-#define PTR_KIND(PTR) (kind_t)((PTR) & 0b111)
-#define PTR_OFFSET(PTR) ((PTR) & ~0b111)
+#define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
+#define PTR_OFFSET(PTR) ((PTR) & PTR_OFFSET_MASK)
 
 /** LEAF nodes (size = 0)
 
@@ -112,9 +115,11 @@ node.
 If 'next_kind' is LEAF, what follows is the pointer to the leaf node instead.
 */
 
+#define PREFIX_NODE_LENGTH 3
+
 typedef struct
 {
-  char prefix[3];
+  char prefix[PREFIX_NODE_LENGTH];
   char next_kind;
   ptr_t leaf[]; /** Present only if 'next_kind = LEAF'. */
 } prefix_t;

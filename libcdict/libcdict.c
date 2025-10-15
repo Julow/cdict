@@ -8,11 +8,6 @@
 
 cdict_t cdict_of_string(char const *data, int size)
 {
-  assert(sizeof(branches_t) == 4);
-  assert(sizeof(branches_with_leaf_t) == 4);
-  assert(sizeof(prefix_t) == 4);
-  assert(sizeof(btree_t) == 8);
-  assert(sizeof(btree_with_leaf_t) == 4);
   header_t const *h = (void const*)data;
   cdict_t dict = {
     .data = data,
@@ -70,7 +65,7 @@ static ptr_or_null_t cdict_find_prefix(void const *data, int32_t off,
     if (word == end) return 0;
     if (*word != p) return 0;
     word++;
-    if (i == 3) break;
+    if (i == PREFIX_NODE_LENGTH) break;
     p = node->prefix[i];
     if (p == 0) break;
     i++;

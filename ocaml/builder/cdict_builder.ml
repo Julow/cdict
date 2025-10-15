@@ -1,3 +1,5 @@
+open Constants
+
 module Trie = struct
   (** A simple trie implementation that can be created from a list of words. *)
 
@@ -34,8 +36,6 @@ module Optimized = struct
   (** Encode a trie into a form closer to libcdict's format, taking advantages
       of possible optimisations. *)
 
-  let prefix_node_max_length = 3
-
   module Id : sig
     type t = private int
 
@@ -66,7 +66,7 @@ module Optimized = struct
     | Leaf of 'a
     | Branches of { leaf : 'a option; branches : 'a branches }
     | Btree of { leaf : 'a option; labels : string; branches : Id.t array }
-    | Prefix of string * Id.t  (** 1 to 4 bytes prefix *)
+    | Prefix of string * Id.t  (** 1 to 3 bytes prefix *)
 
   type 'a t = 'a node IdMap.t
 
@@ -80,7 +80,7 @@ module Optimized = struct
     b.b_branches :: Option.fold ~none:[] ~some:branches_to_list b.b_next
 
   let rec fold_prefix prefix trie =
-    if String.length prefix >= prefix_node_max_length then (prefix, trie)
+    if String.length prefix >= C.c_PREFIX_NODE_LENGTH then (prefix, trie)
     else
       match trie with
       | { Trie.leaf = None; branches = [ (c, next) ] } ->
@@ -92,9 +92,9 @@ module Optimized = struct
     let split_cost =
       (* Branches node header + arbitrary value representing the runtime cost
          of traversing to an other node. *)
-      4 + 12
+      S.branches_t + 12
     in
-    let branch_cost = 4 in
+    let branch_cost = S.ptr_t in
     split_cost / branch_cost
 
   (** The number of chained [branches] nodes at which a Btree node is
@@ -119,14 +119,18 @@ module Optimized = struct
     let b = List.concat b in
     let len = List.length b in
     let has_nul_label = match b with ('\000', _) :: _ -> true | _ -> false in
-    (* Btree nodes can't have more than 8 branches and can't represent a NUL
-       label. Don't make a Btree node if the branches node has few 'next'
-       nodes. *)
-    if len > 8 || n_branches < branches_btree_cutoff || has_nul_label then None
+    (* Btree nodes can't have more than [BTREE_NODE_LENGTH] branches and
+       can't represent a NUL label. Don't make a Btree node if the branches
+       node has few 'next' nodes. *)
+    if
+      len > C.c_BTREE_NODE_LENGTH
+      || n_branches < branches_btree_cutoff
+      || has_nul_label
+    then None
     else
       let tree = Complete_tree.(to_array (of_sorted_list b)) in
       let labels =
-        String.init 8 (fun i ->
+        String.init C.c_BTREE_NODE_LENGTH (fun i ->
             if i < Array.length tree then fst tree.(i) else '\000')
       in
       let branches = Array.map snd tree in
@@ -183,9 +187,11 @@ module Buf = struct
   let output out_chan b = Out_channel.output out_chan b.b 0 b.end_
 
   module Open = struct
-    let w_int32 b off i = Bytes.set_int32_le b.b off i
-    let w_int8 b off i = Bytes.set_uint8 b.b off i
-    let w_str b off s = Bytes.blit_string s 0 b.b off (String.length s)
+    let w_int32 b node_off off i = Bytes.set_int32_le b.b (node_off + off) i
+    let w_int8 b node_off off i = Bytes.set_uint8 b.b (node_off + off) i
+
+    let w_str b node_off off s =
+      Bytes.blit_string s 0 b.b (node_off + off) (String.length s)
   end
 
   include Open
@@ -207,21 +213,21 @@ module Ptr = struct
   let offset (Ptr (_, p)) = Int32.to_int p
 
   let tag_of_kind = function
-    | `Leaf -> 0b001l
-    | `Prefix -> 0b010l
-    | `Branches -> 0b000l
-    | `Branches_with_leaf -> 0b011l
-    | `Btree -> 0b100l
-    | `Btree_with_leaf -> 0b101l
+    | `Leaf -> C.tag_LEAF
+    | `Prefix -> C.tag_PREFIX
+    | `Branches -> C.tag_BRANCHES
+    | `Branches_with_leaf -> C.tag_BRANCHES_WITH_LEAF
+    | `Btree -> C.tag_BTREE
+    | `Btree_with_leaf -> C.tag_BTREE_WITH_LEAF
 
   let tag (Ptr (kind, _)) = Int32.to_int (tag_of_kind kind)
 
   let to_int32 (Ptr (kind, ptr)) =
-    if not Int32.(logand ptr 0b111l = 0l) then
+    if not Int32.(logand ptr C.c_PTR_KIND_MASK = 0l) then
       failwith "Writing misaligned pointer";
     Int32.(logor (tag_of_kind kind) ptr)
 
-  let w b off t = Buf.w_int32 b off (to_int32 t)
+  let w b node_off off t = Buf.w_int32 b node_off off (to_int32 t)
 end
 
 module Writer = struct
@@ -272,22 +278,25 @@ module Writer = struct
         write_btree_node ?align b ~alloc_leaf nodes labels branches
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
-    let off = alloc ?align b 4 in
+    let off = alloc ?align b S.prefix_t in
     (* Special representation when 'next' is a Leaf node. *)
     let next_ptr =
       match Optimized.find next nodes with
       | Optimized.Leaf leaf ->
-          let leaf_ptr_off = alloc ~align:false b 4 in
+          assert (alloc ~align:false b S.ptr_t = O.prefix_t_leaf + off);
           let leaf_ptr = alloc_leaf leaf in
-          Ptr.w b leaf_ptr_off leaf_ptr;
+          Ptr.w b off O.prefix_t_leaf leaf_ptr;
           leaf_ptr
-      | _ -> write_node ~align:false b ~alloc_leaf nodes next
+      | _ ->
+          let next_ptr = write_node ~align:false b ~alloc_leaf nodes next in
+          assert (Ptr.offset next_ptr - off = S.prefix_t);
+          next_ptr
     in
-    assert (String.length p <= Optimized.prefix_node_max_length);
+    assert (String.length p <= C.c_PREFIX_NODE_LENGTH);
     for i = 0 to String.length p - 1 do
-      w_int8 b (off + i) (Char.code p.[i])
+      w_int8 b off (O.prefix_t_prefix + i) (Char.code p.[i])
     done;
-    w_int8 b (off + Optimized.prefix_node_max_length) (Ptr.tag next_ptr);
+    w_int8 b off O.prefix_t_next_kind (Ptr.tag next_ptr);
     Ptr.v `Prefix off
 
   and write_branches_node ?align b ~alloc_leaf nodes brs =
@@ -303,8 +312,8 @@ module Writer = struct
        ensure that they are continuous. Disable alignment to avoid inserting
        padding before a 'next' branches node. Alignment is done explicitly in
        [write_node]. *)
-    let off = alloc ?align b (4 + (len * 4)) in
-    let branch_off n = off + 4 + (n * 4) in
+    let off = alloc ?align b (S.branches_t + (len * S.ptr_t)) in
+    let branch_off n = O.branches_t_branches + (n * S.ptr_t) in
     let has_next =
       match brs.b_next with
       | Some next ->
@@ -315,42 +324,44 @@ module Writer = struct
     List.iter
       (fun (c, id) ->
         let c = Char.code c in
-        Ptr.w b (branch_off (c - min_value)) (write_node b ~alloc_leaf nodes id))
+        Ptr.w b off
+          (branch_off (c - min_value))
+          (write_node b ~alloc_leaf nodes id))
       brs.b_branches;
-    w_int8 b off min_value;
-    w_int8 b (off + 1) len;
-    w_int8 b (off + 2) has_next;
+    w_int8 b off O.branches_t_low min_value;
+    w_int8 b off O.branches_t_length len;
+    w_int8 b off O.branches_t_has_next has_next;
     Ptr.v `Branches off
 
   and write_branches_with_leaf_node ?align b ~alloc_leaf nodes leaf brs =
-    let off = alloc ?align b 4 in
+    let off = alloc ?align b S.branches_with_leaf_t in
     let next_off = write_branches_node ~align:false b ~alloc_leaf nodes brs in
-    assert (Ptr.offset next_off = off + 4);
-    Ptr.w b off (alloc_leaf leaf);
+    assert (Ptr.offset next_off = off + O.branches_with_leaf_t_b);
+    Ptr.w b off O.branches_with_leaf_t_leaf (alloc_leaf leaf);
     Ptr.v `Branches_with_leaf off
 
   and write_btree_node_with_leaf ?align b ~alloc_leaf nodes leaf labels brs =
-    let off = alloc ?align b 4 in
+    let off = alloc ?align b S.btree_with_leaf_t in
     let b_off = write_btree_node ~align:false b ~alloc_leaf nodes labels brs in
-    assert (Ptr.offset b_off = off + 4);
-    Ptr.w b off (alloc_leaf leaf);
+    assert (Ptr.offset b_off = off + O.btree_with_leaf_t_b);
+    Ptr.w b off O.btree_with_leaf_t_leaf (alloc_leaf leaf);
     Ptr.v `Btree_with_leaf off
 
   and write_btree_node ?align b ~alloc_leaf nodes labels brs =
-    let off = alloc ?align b (8 + (Array.length brs * 4)) in
-    w_str b off labels;
+    let off = alloc ?align b (S.btree_t + (Array.length brs * S.ptr_t)) in
+    let branch_off i = S.btree_t + (i * S.ptr_t) in
+    w_str b off O.btree_t_labels labels;
     Array.iteri
-      (fun i n ->
-        Ptr.w b (off + 8 + (i * 4)) (write_node b ~alloc_leaf nodes n))
+      (fun i n -> Ptr.w b off (branch_off i) (write_node b ~alloc_leaf nodes n))
       brs;
     Ptr.v `Btree off
 
   let write_tree b ~encode_leaf nodes =
     let alloc_leaf leaf = Ptr.v_leaf (encode_leaf leaf) in
-    let header_off = alloc b 4 in
+    let header_off = alloc b S.header_t in
     assert (header_off = 0);
     let root_ptr = write_node b ~alloc_leaf nodes Optimized.Id.zero in
-    Ptr.w b header_off root_ptr
+    Ptr.w b header_off O.header_t_root_ptr root_ptr
 end
 
 let to_buf tree ~encode_leaf =
