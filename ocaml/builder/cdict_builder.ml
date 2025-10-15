@@ -446,4 +446,32 @@ let stats ppf tree =
     with_leafs;
   ()
 
+let rec pp pp_leaf nodes ppf id =
+  let open Optimized in
+  let fpf fmt = Format.fprintf ppf fmt in
+  match IdMap.find id nodes with
+  | Leaf leaf -> fpf "@[<hv 2>Leaf@ %a@]" pp_leaf leaf
+  | Branches brs ->
+      let rec loop _ brs =
+        List.iter
+          (fun (c, id) -> fpf "%c %a@ " c (pp pp_leaf nodes) id)
+          brs.b_branches;
+        match brs.b_next with Some b -> fpf "next@ %a" loop b | None -> ()
+      in
+      fpf "@[<v 2>Branches@ %a@]" loop brs
+  | Btree (labels, brs) ->
+      fpf "@[<v 2>Btree@ ";
+      for i = 0 to Array.length brs - 1 do
+        fpf "%c %a@ " labels.[i] (pp pp_leaf nodes) brs.(i)
+      done;
+      fpf "@]"
+  | Prefix (prefix, next) ->
+      fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp pp_leaf nodes) next
+  | With_leaf (leaf, next) ->
+      fpf "@[<v 2>With_leaf@ %a@ %a@]" pp_leaf leaf (pp pp_leaf nodes) next
+
+let pp pp_leaf ppf nodes =
+  pp pp_leaf nodes ppf Optimized.Id.zero;
+  Format.fprintf ppf "@\n"
+
 module Complete_tree = Complete_tree

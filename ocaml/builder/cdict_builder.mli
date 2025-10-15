@@ -17,6 +17,8 @@ val to_string : 'a t -> encode_leaf:('a -> int) -> string
 val stats : Format.formatter -> 'a t -> unit
 (** Print various stats for debugging and testing purposes. *)
 
+val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
 (**/**)
 
 (** Exposed for testing purposes *)
