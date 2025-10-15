@@ -32,10 +32,9 @@ int main()
   VAL_INT32(c_, PTR_OFFSET_MASK);
   VAL_INT32(tag_, LEAF);
   VAL_INT32(tag_, BRANCHES);
-  VAL_INT32(tag_, BRANCHES_WITH_LEAF);
   VAL_INT32(tag_, PREFIX);
   VAL_INT32(tag_, BTREE);
-  VAL_INT32(tag_, BTREE_WITH_LEAF);
+  VAL_INT32(tag_, WITH_LEAF);
 
   end();
   module("O");
@@ -45,9 +44,6 @@ int main()
   FIELD(branches_t, has_next);
   FIELD(branches_t, branches);
 
-  FIELD(branches_with_leaf_t, leaf);
-  FIELD(branches_with_leaf_t, b);
-
   FIELD(prefix_t, prefix);
   FIELD(prefix_t, next_kind);
   FIELD(prefix_t, leaf);
@@ -55,8 +51,7 @@ int main()
   FIELD(btree_t, labels);
   FIELD(btree_t, next);
 
-  FIELD(btree_with_leaf_t, leaf);
-  FIELD(btree_with_leaf_t, b);
+  FIELD(with_leaf_t, leaf);
 
   FIELD(header_t, root_ptr);
 
@@ -65,10 +60,9 @@ int main()
 
   SIZE(ptr_t);
   SIZE(branches_t);
-  SIZE(branches_with_leaf_t);
   SIZE(prefix_t);
   SIZE(btree_t);
-  SIZE(btree_with_leaf_t);
+  SIZE(with_leaf_t);
   SIZE(header_t);
 
   end();

@@ -15,7 +15,7 @@ let assert_found d word expected_leaf =
   | Some leaf ->
       if leaf <> expected_leaf then
         fail "Expected %d but got %d for word %S" expected_leaf leaf word
-  | None -> fail "Expected word not found"
+  | None -> fail "Expected word %S not found" word
 
 let create_and_assert words =
   let d = create words in

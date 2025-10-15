@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  136K dict
+  128K dict
 
   $ cdict-tool query dict type module function value match
   found: "type" freq=2070
@@ -23,25 +23,27 @@
   $ cdict-tool stats words.combined
   Parsing "words.combined"
   Generating a 7984 words dictionary.
-  Nodes: 16448
+  Nodes: 18081
   Leaf nodes: 5923
-  Branch nodes: 2050
-    With leaf: 1348
+  Branch nodes: 951
     With 'next' nodes:
-    |  1: 1957 |  2: 46   |  3: 26   |  4: 9    |  5: 5    |  6: 4   
+    |  1: 858  |  2: 46   |  3: 26   |  4: 9    |  5: 5    |  6: 4   
     |  7: 3    |
-    Ranges: 2233:
-      |  1: 1171 |  2: 737  |  3: 128  |  4: 38   |  5: 32   |  6: 24  
+    Ranges: 1134:
+      |  1: 72   |  2: 737  |  3: 128  |  4: 38   |  5: 32   |  6: 24  
       |  7: 23   |  8: 7    |  9: 15   | 10: 15   | 11: 8    | 12: 5   
       | 13: 8    | 14: 1    | 15: 6    | 16: 3    | 17: 4    | 18: 1   
       | 19: 2    | 20: 1    | 21: 2    | 26: 1    | 27: 1    |
-  Prefix nodes: 6637
+  Prefix nodes: 7308
     Followed by:
-    | Branches: 915  | Btree: 488  | Leaf: 3844 | Prefix: 1390 |
+    | Branches: 238  | Btree: 252  | Leaf: 4372 | Prefix: 1482
+    | With_leaf: 964  |
     With size:
-    |  1: 2464 |  2: 1749 |  3: 2424 |
+    |  1: 2852 |  2: 1887 |  3: 2569 |
   Btree nodes: 1838
-    With leaf: 713
     With size:
     |  2: 1070 |  3: 403  |  4: 191  |  5: 65   |  6: 44   |  7: 42  
     |  8: 23   |
+  With_leaf nodes: 2061
+    With next:
+    | Branches: 249  | Btree: 713  | Prefix: 1099 |

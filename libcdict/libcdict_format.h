@@ -28,10 +28,9 @@ typedef enum
 {
   LEAF = 0b001,
   BRANCHES = 0b000,
-  BRANCHES_WITH_LEAF = 0b011,
   PREFIX = 0b010,
   BTREE = 0b100,
-  BTREE_WITH_LEAF = 0b101,
+  WITH_LEAF = 0b011,
 } kind_t;
 
 #define PTR_KIND_MASK 0b111
@@ -83,19 +82,6 @@ typedef struct
     appears twice. */
 #define BRANCHES_NEXT(B_PTR) (((void*)(B_PTR)) + BRANCHES_SIZE(*(B_PTR)))
 
-/** BRANCHES WITH LEAF node (size = 4 bytes + branches node)
-
-A variant of the branches node with a leaf pointers. This node is treated as a
-leaf if it is encountered at the end of the query or a branches node otherwise.
-*/
-
-typedef struct
-{
-  ptr_t leaf;
-  /** A pointer to a leaf. Pointers to other kind of nodes are not allowed. */
-  branches_t b[];
-} branches_with_leaf_t;
-
 /** PREFIX nodes (size = 4 bytes)
 
 A single branch, consuming up to 3 bytes from the query.
@@ -132,9 +118,6 @@ corresponding pointer in 'next'.
 
 This node doesn't support NUL prefixes, finding a NUL in 'labels' means that
 the end of tree was reached.
-
-'btree_with_leaf_t' is a variant with a leaf attached, just like
-'branches_with_leaf_t'.
 */
 
 #define BTREE_NODE_LENGTH 8
@@ -145,11 +128,23 @@ typedef struct
   ptr_t next[];
 } btree_t;
 
+/** WITH_LEAF nodes (size = 4 bytes)
+
+A node that doesn't consume any prefix and is treated as a leaf if it is
+encountered at the end of the query.
+The next node is at offset [+ sizeof(with_leaf_t)]. The 'leaf' field is not a
+pointer to a leaf, instead it is composed of:
+- The 29 highest bits are the leaf data, just like in a leaf pointer.
+- The 3 lowest bits are the kind of the next node. It is never equal to 'LEAF'.
+*/
+
 typedef struct
 {
-  ptr_t leaf;
-  btree_t b[];
-} btree_with_leaf_t;
+  int32_t leaf; // Not a ptr_t
+} with_leaf_t;
+
+#define WITH_LEAF_LEAF(PTR) (PTR_OFFSET(((with_leaf_t const*)(PTR))->leaf) | LEAF)
+#define WITH_LEAF_KIND(PTR) PTR_KIND(((with_leaf_t const*)(PTR))->leaf)
 
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 
