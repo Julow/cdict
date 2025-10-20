@@ -1,4 +1,5 @@
 (cram
+ (package cdict-tool)
  (deps %{bin:cdict-tool}))
 
 (cram
