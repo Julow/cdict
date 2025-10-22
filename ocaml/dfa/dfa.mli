@@ -12,24 +12,24 @@
 
 type id
 
-type state = {
+type 'a state = {
   tr : (char * id) list;  (** Transitions sorted in lexicographic order. *)
-  final : bool;
-      (** Whether the node is final, meaning this node represents the end of a
-          word. *)
+  leaves : 'a list;
+      (** Metadata of words that ends at this state. A state is final
+          if-and-only-if it has a non-empty [leafs] field. *)
 }
 
-type t
+type 'a t
 
-val state : t -> id -> state
+val state : 'a t -> id -> 'a state
 (** Access a state. From its ID. IDs are found in a state [tr] field. *)
 
-val root_state : t -> state
+val root_state : 'a t -> 'a state
 (** Access the root state. *)
 
-val of_sorted_list : string list -> t
+val of_sorted_list : (string * 'a) list -> 'a t
 (** Construct a minimal DFA from a lexicographically sorted list. If the list is
     not sorted, the DFA will not be minimal. *)
 
-val pp : Format.formatter -> t -> unit
+val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 (** Pretty print the internal structure of the DFA. For debugging purposes. *)
