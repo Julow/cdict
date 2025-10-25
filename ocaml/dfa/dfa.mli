@@ -12,12 +12,16 @@
 
 type id
 
-type 'a state = {
-  tr : (char * id) list;  (** Transitions sorted in lexicographic order. *)
+type 'a transition = {
+  c : char;
+  next : id;
   leaves : 'a list;
       (** Metadata of words that ends at this state. A state is final
           if-and-only-if it has a non-empty [leafs] field. *)
 }
+
+type 'a state = 'a transition list
+(** Transitions sorted in lexicographic order. *)
 
 type 'a t
 
