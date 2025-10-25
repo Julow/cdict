@@ -141,10 +141,11 @@ let add_suffix m sti suffix leaf =
     in
     (m, { c = suffix.[i]; next; leaves })
   in
-  assert (len > 0);
-  let st = state m sti in
-  let m, tr' = loop m 0 in
-  add m sti (st @ [ tr' ])
+  if len = 0 then (* Remove a duplicate. *) m
+  else
+    let st = state m sti in
+    let m, tr' = loop m 0 in
+    add m sti (st @ [ tr' ])
 
 let has_children st = st <> []
 

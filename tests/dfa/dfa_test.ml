@@ -16,7 +16,7 @@ let fail_expected ?(msg = "") pp_a got expected =
     pp_a expected pp_a got;
   failwith "Test failure"
 
-let test words expected =
+let test ?expected_words words expected =
   let expected = String.trim expected in
   let words = List.sort String.compare words in
   let dfa = of_sorted_list (List.mapi (fun i w -> (w, i)) words) in
@@ -24,11 +24,14 @@ let test words expected =
   let output = String.trim (Format.asprintf "%a" (pp pp_leaf) dfa) in
   if output <> expected then
     fail_expected Format.pp_print_string output expected;
+  let expected_words =
+    match expected_words with Some w -> w | None -> words
+  in
   let words' = words_of_dfa dfa in
-  if words' <> words then
+  if words' <> expected_words then
     fail_expected ~msg:"Missing words. "
       Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
-      words' words
+      words' expected_words
 
 let () =
   test
@@ -113,3 +116,11 @@ let () =
                            's' <leaf 26>
                                (16 seen)
 |}
+
+(** Duplicate leaves. *)
+let () =
+  test ~expected_words:[ "être" ] [ "être"; "être" ]
+    {|
+.0   '\195' 88  '\170' 87  't' 86  'r' 85  'e' <leaf 0>
+                                               84
+    |}

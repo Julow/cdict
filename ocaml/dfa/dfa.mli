@@ -16,8 +16,9 @@ type 'a transition = {
   c : char;
   next : id;
   leaves : 'a list;
-      (** Metadata of words that ends at this state. A state is final
-          if-and-only-if it has a non-empty [leafs] field. *)
+      (** Metadata of words that ends after this transition. Word metadata are
+          ambiguous, a single final transition can contain word metadata for
+          several words. Sorted by the order they appear in the input. *)
 }
 
 type 'a state = 'a transition list
@@ -33,7 +34,7 @@ val root_state : 'a t -> 'a state
 
 val of_sorted_list : (string * 'a) list -> 'a t
 (** Construct a minimal DFA from a lexicographically sorted list. If the list is
-    not sorted, the DFA will not be minimal. *)
+    not sorted, the DFA will not be minimal. Duplicated words are removed. *)
 
 val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 (** Pretty print the internal structure of the DFA. For debugging purposes. *)
