@@ -38,3 +38,12 @@ val of_sorted_list : (string * 'a) list -> 'a t
 
 val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 (** Pretty print the internal structure of the DFA. For debugging purposes. *)
+
+(** Allowed operations on values of type [id]. *)
+module Id : sig
+  type t = id
+
+  val compare : t -> t -> int
+
+  module Map : Map.S with type key = t
+end
