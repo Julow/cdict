@@ -45,13 +45,13 @@ int main()
   FIELD(branches_t, branches);
 
   FIELD(prefix_t, prefix);
-  FIELD(prefix_t, next_kind);
-  FIELD(prefix_t, leaf);
+  FIELD(prefix_t, next);
 
   FIELD(btree_t, labels);
   FIELD(btree_t, next);
 
   FIELD(with_leaf_t, leaf);
+  FIELD(with_leaf_t, next);
 
   FIELD(header_t, root_ptr);
 

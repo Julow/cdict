@@ -93,21 +93,14 @@ XX ++ 00  A 2 byte prefix
 XX ++ ++  A 3 byte prefix
 This means that a word containing a long string of NUL byte is very
 inefficiently encoded.
-
-The 'next_kind' field is interpreted as the kind of the node that follows, it's
-a value of type 'kind_t'. The node that follows starts just after the prefix
-node.
-
-If 'next_kind' is LEAF, what follows is the pointer to the leaf node instead.
 */
 
-#define PREFIX_NODE_LENGTH 3
+#define PREFIX_NODE_LENGTH 4
 
 typedef struct
 {
   char prefix[PREFIX_NODE_LENGTH];
-  char next_kind;
-  ptr_t leaf[]; /** Present only if 'next_kind = LEAF'. */
+  ptr_t next;
 } prefix_t;
 
 /** BTREE nodes (size = 8 bytes to 40 bytes)
@@ -132,19 +125,13 @@ typedef struct
 
 A node that doesn't consume any prefix and is treated as a leaf if it is
 encountered at the end of the query.
-The next node is at offset [+ sizeof(with_leaf_t)]. The 'leaf' field is not a
-pointer to a leaf, instead it is composed of:
-- The 29 highest bits are the leaf data, just like in a leaf pointer.
-- The 3 lowest bits are the kind of the next node. It is never equal to 'LEAF'.
 */
 
 typedef struct
 {
-  int32_t leaf; // Not a ptr_t
+  ptr_t leaf;
+  ptr_t next;
 } with_leaf_t;
-
-#define WITH_LEAF_LEAF(PTR) (PTR_OFFSET(((with_leaf_t const*)(PTR))->leaf) | LEAF)
-#define WITH_LEAF_KIND(PTR) PTR_KIND(((with_leaf_t const*)(PTR))->leaf)
 
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 

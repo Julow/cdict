@@ -208,9 +208,10 @@ module Ptr = struct
 
   let v kind ptr = Ptr (kind, Int32.of_int ptr)
   let v_leaf v = Ptr (`Leaf, Int32.(shift_left (of_int v) 3))
-  let kind (Ptr (k, _)) = k
-  let offset (Ptr (_, p)) = Int32.to_int p
-  let with_kind kind (Ptr (_, p)) = Ptr (kind, p)
+  (* let kind (Ptr (k, _)) = k *)
+  (* let offset (Ptr (_, p)) = Int32.to_int p *)
+  (* let with_kind kind (Ptr (_, p)) = Ptr (kind, p) *)
+  (* let tag (Ptr (kind, _)) = Int32.to_int (tag_of_kind kind) *)
 
   let tag_of_kind = function
     | `Leaf -> C.tag_LEAF
@@ -218,8 +219,6 @@ module Ptr = struct
     | `Branches -> C.tag_BRANCHES
     | `Btree -> C.tag_BTREE
     | `With_leaf -> C.tag_WITH_LEAF
-
-  let tag (Ptr (kind, _)) = Int32.to_int (tag_of_kind kind)
 
   let to_int32 (Ptr (kind, ptr)) =
     if not Int32.(logand ptr C.c_PTR_KIND_MASK = 0l) then
@@ -275,33 +274,21 @@ module Writer = struct
 
   and write_with_leaf ?align b ~alloc_leaf nodes leaf next =
     let off = alloc ?align b S.with_leaf_t in
-    let next_ptr = write_node ~align:false b ~alloc_leaf nodes next in
-    assert (Ptr.offset next_ptr = off + S.with_leaf_t);
+    let next_ptr = write_node b ~alloc_leaf nodes next in
     let leaf_ptr = alloc_leaf leaf in
-    Ptr.w b off O.with_leaf_t_leaf (Ptr.with_kind (Ptr.kind next_ptr) leaf_ptr);
+    Ptr.w b off O.with_leaf_t_leaf leaf_ptr;
+    Ptr.w b off O.with_leaf_t_next next_ptr;
     Ptr.v `With_leaf off
 
   and write_prefix_node ?align b ~alloc_leaf nodes p next =
     let off = alloc ?align b S.prefix_t in
-    (* Special representation when 'next' is a Leaf node. *)
-    let next_ptr =
-      match Optimized.find next nodes with
-      | Optimized.Leaf leaf ->
-          assert (alloc ~align:false b S.ptr_t = O.prefix_t_leaf + off);
-          let leaf_ptr = alloc_leaf leaf in
-          Ptr.w b off O.prefix_t_leaf leaf_ptr;
-          leaf_ptr
-      | _ ->
-          let next_ptr = write_node ~align:false b ~alloc_leaf nodes next in
-          assert (Ptr.offset next_ptr - off = S.prefix_t);
-          next_ptr
-    in
+    let next_ptr = write_node b ~alloc_leaf nodes next in
     assert (String.length p <= C.c_PREFIX_NODE_LENGTH);
     w_bzero b off O.prefix_t_prefix C.c_PREFIX_NODE_LENGTH;
     for i = 0 to String.length p - 1 do
       w_int8 b off (O.prefix_t_prefix + i) (Char.code p.[i])
     done;
-    w_int8 b off O.prefix_t_next_kind (Ptr.tag next_ptr);
+    Ptr.w b off O.prefix_t_next next_ptr;
     Ptr.v `Prefix off
 
   and write_branches_node ?align b ~alloc_leaf nodes brs =
