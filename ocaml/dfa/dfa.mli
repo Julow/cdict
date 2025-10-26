@@ -3,8 +3,8 @@
     with a 8 bits alphabet and treat words as byte strings.
 
     The construction step runs in O(n^2) but remains a costly operation. The DFA
-    cannot be modified once it's constructed. It is ideal for dictionaries for
-    natural languages that are constructed once and compiled into a compact
+    cannot be modified once it's constructed. It is ideal for natural language
+    dictionaries that are constructed once and compiled into a compact
     representation.
 
     Perfect hashing is implemented using the {!field-number} field in each

@@ -111,7 +111,12 @@ end
     Applications of Finite Automata Representing Large Vocabularies
     by Cláudio L. Lucchesi and Tomasz Kowaltowski
     https://www.cs.mun.ca/~harold/Courses/Old/CS4750.F14/Diary/1992-001.pdf
-    v} *)
+    v}
+    With the following differences:
+
+    - Only the 'number' field from the traversed transitions need to be read.
+      The preceding transitions in the traversed nodes are no longer taken into
+      account. *)
 
 module R = Map.Make (State)
 (** Register *)
@@ -183,36 +188,22 @@ let add_word_sorted (reg, m) word =
   let reg, m = replace_or_register reg m last_statei in
   (reg, add_suffix m last_statei current_suffix)
 
-let rec state_number acc = function
-  | [] -> acc
-  | hd :: _ when hd.number < 0 -> ~-1
-  | hd :: tl ->
-      let f' = if hd.final then 1 else 0 in
-      state_number (acc + hd.number + f') tl
-
-let rec numbers_state m sti =
-  let st = M.find sti m in
-  let n = state_number 0 st in
-  if n >= 0 then (m, n)
-  else
-    let m, trs =
-      List.fold_left
-        (fun (m, trs) tr ->
-          let m, tr =
-            if tr.number >= 0 then (m, tr)
-            else
-              let m, number = numbers_state m tr.next in
-              (m, { tr with number })
-          in
-          (m, tr :: trs))
-        (m, []) st
-    in
-    let st = List.rev trs in
-    (M.add sti st m, state_number 0 st)
+let numbers_state m =
+  let rec map_trs m index acc = function
+    | tr :: tl ->
+        let acc = { tr with number = index } :: acc in
+        let m, size = map_st m 0 tr.next in
+        let size = if tr.final then size + 1 else size in
+        map_trs m (index + size) acc tl
+    | [] -> (m, index, List.rev acc)
+  and map_st m index sti =
+    let m, size, trs = map_trs m 0 [] (M.find sti m) in
+    (M.add sti trs m, index + size)
+  in
+  fst (map_st m 0 Id.zero)
 
 let of_sorted_list words =
   let empty = (R.empty, M.singleton Id.zero []) in
   let reg, m = List.fold_left add_word_sorted empty words in
   let _, m = replace_or_register reg m Id.zero in
-  let m, _ = numbers_state m Id.zero in
-  m
+  numbers_state m
