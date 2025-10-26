@@ -29,16 +29,18 @@ module M = Id.Map
 
 type id = Id.t
 
-type 'a transition = {
+type transition = {
   c : char;
   next : id;
-  leaves : 'a list;  (** Reverse order of the input *)
+  number : int;
+      (** Equal to [-1] during construction, computed in a second step. *)
+  final : bool;
 }
 
-type 'a state = 'a transition list
+type state = transition list
 (** Sorted by [c] *)
 
-type 'a t = 'a state M.t
+type t = state M.t
 
 let state m id = M.find id m
 let root_state m = state m Id.zero
@@ -55,7 +57,7 @@ let rec list_last = function
   | [ x ] -> Some x
   | _ :: tl -> list_last tl
 
-let pp pp_metadata ppf m =
+let pp ppf m =
   let module S = Set.Make (Id) in
   let fpf = Format.fprintf in
   let pplist pp_a = Format.(pp_print_list ~pp_sep:pp_print_space pp_a) in
@@ -67,45 +69,49 @@ let pp pp_metadata ppf m =
         seen := S.add sti !seen;
         fpf ppf "%-4d@[<v>%a@]" (sti :> int) (pplist pp_tr) trs
     | None -> fpf ppf " <removed>"
-  and pp_leaves ppf leaves =
-    if leaves = [] then ()
-    else fpf ppf "<leaf @[<hov>%a@]>@ " (pplist pp_metadata) leaves
   and pp_tr ppf tr =
-    fpf ppf "%C @[<v>%a%a@]" tr.c pp_leaves tr.leaves pp_st tr.next
+    fpf ppf "%C @[<v>(n=%d)" tr.c tr.number;
+    if tr.final then fpf ppf " (final)";
+    fpf ppf "@ %a@]" pp_st tr.next
   in
   fpf ppf ".%a" pp_st Id.zero
 
 module State = struct
-  type t = S : 'a state -> t [@@unboxed]
+  type t = state
 
-  (** Compare two states structurally. Leaves are not compared. *)
-  let compare (S a) (S b) =
-    let rec loop a b =
-      match (a, b) with
-      | [], [] -> 0
-      | [], _ -> ~-1
-      | _, [] -> 1
-      | a :: at, b :: bt ->
-          let d = Char.compare a.c b.c in
-          if d <> 0 then d
-          else
-            let d = Id.compare a.next b.next in
-            if d <> 0 then d else loop at bt
-    in
-    loop a b
+  (** Compare two states structurally. The [index] field is not compared. *)
+  let compare a b =
+    List.compare
+      (fun a b ->
+        let d = Char.compare a.c b.c in
+        if d <> 0 then d
+        else
+          let d = Id.compare a.next b.next in
+          if d <> 0 then d else Bool.compare a.final b.final)
+      a b
 end
 
-(** From the paper https://arxiv.org/pdf/cs/0007009 with some differences:
+(** The construction algorithm is from the paper:
+    {v
+    Incremental Construction of Minimal Acyclic Finite-State Automata
+    by Jan Daciuk, Stoyan Mihov, Bruce Watson, Richard Watson
+    https://arxiv.org/pdf/cs/0007009
+    v}
+    With the following differences:
 
     - Final transitions are used instead of final nodes to represent the end of
       words.
-    - Final and non-final transitions with the same character and [next] pointer
-      are considered equal.
-    - Transitions are merged and a single transition can hold several word
-      metadata. The DFA contain no way to disambiguate between the word
-      metadata.
-    - Word metadata are merged in [replace_or_register] when the last children
-      is replaced by an equivalent node. *)
+    - Duplicated words in the input list do not crash the program.
+    - Additional bookkeeping is added to reduce the size of the register during
+      construction.
+    - The incremental algorithm is not used.
+
+    The perfect hashing scheme is from the paper:
+    {v
+    Applications of Finite Automata Representing Large Vocabularies
+    by Cláudio L. Lucchesi and Tomasz Kowaltowski
+    https://www.cs.mun.ca/~harold/Courses/Old/CS4750.F14/Diary/1992-001.pdf
+    v} *)
 
 module R = Map.Make (State)
 (** Register *)
@@ -114,7 +120,7 @@ let common_prefix m word =
   let rec loop id i =
     if i >= String.length word then (i, id)
     else
-      let st = state m id in
+      let st = M.find id m in
       let c = word.[i] in
       match List.find_opt (fun tr -> tr.c = c) st with
       | Some { next; _ } -> loop next (i + 1)
@@ -129,70 +135,84 @@ let rec with_last_child st q =
   | hd :: tl -> hd :: with_last_child tl q
 
 (** Assumes that no prefix of [suffix] is present in [st]. *)
-let add_suffix m sti suffix leaf =
+let add_suffix m sti suffix =
   let len = String.length suffix in
   let rec loop m i =
-    let (m, next), leaves =
-      if i + 1 = len then (new_state m [], [ leaf ])
+    let (m, next), final =
+      if i + 1 = len then (new_state m [], true)
       else
         let m, tr' = loop m (i + 1) in
-        (new_state m [ tr' ], [])
+        (new_state m [ tr' ], false)
     in
-    (m, { c = suffix.[i]; next; leaves })
+    (m, { c = suffix.[i]; next; number = ~-1; final })
   in
   if len = 0 then (* Remove a duplicate. *) m
   else
-    let st = state m sti in
+    let st = M.find sti m in
     let m, tr' = loop m 0 in
     M.add sti (st @ [ tr' ]) m
 
-(** Merge the leaves of states with the same transitions. To ensure some order
-    in the leaves, [a] is the state we are replacing and [b] is the equivalent
-    state found in the register. *)
-let merge_equivalent_states a b =
-  List.map2
-    (fun a b ->
-      assert (a.c = b.c && a.next = b.next);
-      { a with leaves = List.rev_append a.leaves b.leaves })
-    a b
-
 (** Find a state equivalent to [st] in [reg]. *)
 let equivalent_state reg m st =
-  let st_wrapped = State.S st in
-  match R.find_opt st_wrapped reg with
+  match R.find_opt st reg with
   | Some sti ->
-      let st' = state m sti in
-      assert (State.compare st_wrapped (State.S st') = 0);
+      let st' = M.find sti m in
+      assert (State.compare st st' = 0);
       Some (st', sti)
   | None -> None
 
 let rec replace_or_register reg m sti =
-  let st = state m sti in
+  let st = M.find sti m in
   match list_last st with
   | None -> (* No children *) (reg, m)
-  | Some { c = _; next = childi; leaves = _ } -> (
+  | Some { c = _; next = childi; _ } -> (
       let reg, m = replace_or_register reg m childi in
-      let child = state m childi in
+      let child = M.find childi m in
       match equivalent_state reg m child with
       | Some (q, qi) ->
-          (* Merge word metadata and update [q]. *)
-          let q = merge_equivalent_states child q in
           let m =
-            M.remove childi m |> M.add qi q |> M.add sti (with_last_child st qi)
-          and reg =
-            R.remove (State.S st) reg |> R.remove (State.S child)
-            |> R.add (State.S q) qi
-          in
+            m |> M.remove childi |> M.add qi q
+            |> M.add sti (with_last_child st qi)
+          and reg = reg |> R.remove st |> R.remove child |> R.add q qi in
           (reg, m)
-      | None -> (R.add (State.S child) childi reg, m))
+      | None -> (R.add child childi reg, m))
 
-let add_word_sorted (reg, m) (word, leaf) =
+let add_word_sorted (reg, m) word =
   let prefix_len, last_statei = common_prefix m word in
   let _, current_suffix = str_separate word prefix_len in
   let reg, m = replace_or_register reg m last_statei in
-  (reg, add_suffix m last_statei current_suffix leaf)
+  (reg, add_suffix m last_statei current_suffix)
+
+let rec state_number acc = function
+  | [] -> acc
+  | hd :: _ when hd.number < 0 -> ~-1
+  | hd :: tl ->
+      let f' = if hd.final then 1 else 0 in
+      state_number (acc + hd.number + f') tl
+
+let rec numbers_state m sti =
+  let st = M.find sti m in
+  let n = state_number 0 st in
+  if n >= 0 then (m, n)
+  else
+    let m, trs =
+      List.fold_left
+        (fun (m, trs) tr ->
+          let m, tr =
+            if tr.number >= 0 then (m, tr)
+            else
+              let m, number = numbers_state m tr.next in
+              (m, { tr with number })
+          in
+          (m, tr :: trs))
+        (m, []) st
+    in
+    let st = List.rev trs in
+    (M.add sti st m, state_number 0 st)
 
 let of_sorted_list words =
   let empty = (R.empty, M.singleton Id.zero []) in
   let reg, m = List.fold_left add_word_sorted empty words in
-  snd (replace_or_register reg m Id.zero)
+  let _, m = replace_or_register reg m Id.zero in
+  let m, _ = numbers_state m Id.zero in
+  m

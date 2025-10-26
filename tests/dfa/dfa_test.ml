@@ -1,48 +1,72 @@
 open Dfa
 
 let words_of_dfa dfa =
-  let rec loop acc prefix st =
-    List.fold_left
-      (fun acc { c; next; leaves } ->
-        let prefix = prefix ^ String.make 1 c in
-        let acc = if leaves = [] then acc else prefix :: acc in
-        loop acc prefix (state dfa next))
-      acc st
+  let rec loop acc index prefix st =
+    fst
+    @@ List.fold_left
+         (fun (acc, index) { c; next; number; final } ->
+           let prefix = prefix ^ String.make 1 c in
+           let acc, index =
+             if final then ((prefix, index) :: acc, index + 1) else (acc, index)
+           in
+           (loop acc index prefix (state dfa next), index + number))
+         (acc, index) st
   in
-  List.rev (loop [] "" (root_state dfa))
+  List.rev (loop [] 0 "" (root_state dfa))
 
-let fail_expected ?(msg = "") pp_a got expected =
-  Format.eprintf "%sExpected:@\n{@\n%a@\n}@\nbut got:@\n{@\n%a@\n}@\n%!" msg
-    pp_a expected pp_a got;
-  failwith "Test failure"
+let dfa_number dfa =
+  List.fold_left (fun acc tr -> acc + tr.number) 0 (Dfa.root_state dfa)
 
-let test ?expected_words words expected =
-  let expected = String.trim expected in
-  let words = List.sort String.compare words in
-  let dfa = of_sorted_list (List.mapi (fun i w -> (w, i)) words) in
-  let pp_leaf = Format.pp_print_int in
-  let output = String.trim (Format.asprintf "%a" (pp pp_leaf) dfa) in
-  if output <> expected then
-    fail_expected Format.pp_print_string output expected;
+let expect ?(msg = "") pp_a got expected =
+  if got <> expected then (
+    Format.eprintf "%sExpected:@\n{@\n%a@\n}@\nbut got:@\n{@\n%a@\n}@\n%!" msg
+      pp_a expected pp_a got;
+    failwith "Test failure")
+
+let pplist pp_a = Format.(pp_print_list ~pp_sep:pp_print_space) pp_a
+
+let test ?expected_words input_words expected_printed =
+  let input_words = List.sort String.compare input_words in
+  let dfa = of_sorted_list input_words in
+  expect Format.pp_print_string
+    (String.trim (Format.asprintf "%a" pp dfa))
+    (String.trim expected_printed);
   let expected_words =
-    match expected_words with Some w -> w | None -> words
+    match expected_words with
+    | Some ws -> ws
+    | None -> List.mapi (fun i w -> (w, i)) input_words
   in
-  let words' = words_of_dfa dfa in
-  if words' <> expected_words then
-    fail_expected ~msg:"Missing words. "
-      Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
-      words' expected_words
+  let dfa_words = words_of_dfa dfa in
+  expect ~msg:"Missing words. "
+    (pplist Format.pp_print_string)
+    (List.map fst dfa_words)
+    (List.map fst expected_words);
+  expect ~msg:"Wrong total 'number'. " Format.pp_print_int (dfa_number dfa)
+    (List.length expected_words);
+  expect ~msg:"Wrong perfect hash. "
+    (pplist (fun ppf (w, i) -> Format.fprintf ppf "%S (%d)" w i))
+    dfa_words expected_words
 
 let () =
   test
     [ "pomme"; "pommes"; "poire"; "poires"; "coing" ]
     {|
-.0   'c' 5   'o' 4   'i' 3   'n' 2   'g' <leaf 0>
+.0   'c' (n=1)
+         5   'o' (n=1)
+                 4   'i' (n=1)
+                         3   'n' (n=1)
+                                 2   'g' (n=0) (final)
                                          1   
-     'p' 10  'o' 9   'i' 8   'r' 7   'e' <leaf 3 1>
-                                         6   's' <leaf 4 2>
+     'p' (n=4)
+         10  'o' (n=4)
+                 9   'i' (n=2)
+                         8   'r' (n=2)
+                                 7   'e' (n=1) (final)
+                                         6   's' (n=0) (final)
                                                  (1 seen)
-                     'm' 14  'm' (7 seen)
+                     'm' (n=2)
+                         14  'm' (n=2)
+                                 (7 seen)
 |}
 
 (* The data used in the paper *)
@@ -78,49 +102,88 @@ let () =
       "és";
     ]
     {|
-.0   'a' 20  'i' 19  'e' 18  'n' 17  't' <leaf 24 8 7 4 3 0>
+.0   'a' (n=7)
+         20  'i' (n=3)
+                 19  'e' (n=1)
+                         18  'n' (n=1)
+                                 17  't' (n=0) (final)
                                          16  
-                     's' <leaf 9 1>
+                     's' (n=0) (final)
                          (16 seen)
-                     't' <leaf 10 2>
+                     't' (n=0) (final)
                          (16 seen)
-             'n' (17 seen)
-             's' 29  's' 28  'e' 27  'n' (17 seen)
-                                     's' <leaf 5>
+             'n' (n=1)
+                 (17 seen)
+             's' (n=3)
+                 29  's' (n=3)
+                         28  'e' (n=2)
+                                 27  'n' (n=1)
+                                         (17 seen)
+                                     's' (n=0) (final)
                                          (16 seen)
-                             'i' <leaf 6>
+                             'i' (n=0) (final)
                                  (16 seen)
-     'e' 34  'n' (17 seen)
-             'r' 40  'a' 39  'i' (19 seen)
-                             's' <leaf 11>
+     'e' (n=12)
+         34  'n' (n=1)
+                 (17 seen)
+             'r' (n=9)
+                 40  'a' (n=4)
+                         39  'i' (n=3)
+                                 (19 seen)
+                             's' (n=0) (final)
                                  (16 seen)
-                     'e' 45  'z' <leaf 19 13 12>
+                     'e' (n=1)
+                         45  'z' (n=0) (final)
                                  (16 seen)
-                     'i' 48  'e' (45 seen)
-                             'o' 51  'n' 50  's' <leaf 25 23 22 21 20 14>
+                     'i' (n=2)
+                         48  'e' (n=1)
+                                 (45 seen)
+                             'o' (n=1)
+                                 51  'n' (n=1)
+                                         50  's' (n=0) (final)
                                                  (16 seen)
-                     'o' 54  'n' 53  's' <leaf 15>
+                     'o' (n=2)
+                         54  'n' (n=2)
+                                 53  's' (n=0) (final)
                                          (16 seen)
-                                     't' <leaf 16>
+                                     't' (n=0) (final)
                                          (16 seen)
-             's' <leaf 17>
+             's' (n=0) (final)
                  (16 seen)
-             'z' <leaf 18>
+             'z' (n=0) (final)
                  (16 seen)
-     'i' (48 seen)
-     'o' (51 seen)
-     '\195' 71  '\162' 70  'm' 69  'e' (50 seen)
-                           't' (69 seen)
-                '\168' 79  'r' 78  'e' (18 seen)
-                '\169' 82  'e' (50 seen)
-                           's' <leaf 26>
+     'i' (n=2)
+         (48 seen)
+     'o' (n=1)
+         (51 seen)
+     '\195' (n=5)
+            71  '\162' (n=2)
+                       70  'm' (n=1)
+                               69  'e' (n=1)
+                                       (50 seen)
+                           't' (n=1)
+                               (69 seen)
+                '\168' (n=1)
+                       79  'r' (n=1)
+                               78  'e' (n=1)
+                                       (18 seen)
+                '\169' (n=2)
+                       82  'e' (n=1)
+                               (50 seen)
+                           's' (n=0) (final)
                                (16 seen)
 |}
 
 (** Duplicate leaves. *)
 let () =
-  test ~expected_words:[ "être" ] [ "être"; "être" ]
+  test
+    ~expected_words:[ ("être", 0) ]
+    [ "être"; "être" ]
     {|
-.0   '\195' 88  '\170' 87  't' 86  'r' 85  'e' <leaf 0>
+.0   '\195' (n=1)
+            88  '\170' (n=1)
+                       87  't' (n=1)
+                               86  'r' (n=1)
+                                       85  'e' (n=0) (final)
                                                84
     |}
