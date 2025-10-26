@@ -42,11 +42,10 @@ type 'a t = 'a state M.t
 
 let state m id = M.find id m
 let root_state m = state m Id.zero
-let add m id st = M.add id st m
 
 let new_state m tr =
   let id = Id.fresh () in
-  (add m id tr, id)
+  (M.add id tr m, id)
 
 let str_separate s index =
   (String.sub s 0 index, String.sub s index (String.length s - index))
@@ -108,7 +107,8 @@ end
     - Word metadata are merged in [replace_or_register] when the last children
       is replaced by an equivalent node. *)
 
-module Register = Map.Make (State)
+module R = Map.Make (State)
+(** Register *)
 
 let common_prefix m word =
   let rec loop id i =
@@ -144,7 +144,7 @@ let add_suffix m sti suffix leaf =
   else
     let st = state m sti in
     let m, tr' = loop m 0 in
-    add m sti (st @ [ tr' ])
+    M.add sti (st @ [ tr' ]) m
 
 (** Merge the leaves of states with the same transitions. To ensure some order
     in the leaves, [a] is the state we are replacing and [b] is the equivalent
@@ -159,7 +159,7 @@ let merge_equivalent_states a b =
 (** Find a state equivalent to [st] in [reg]. *)
 let equivalent_state reg m st =
   let st_wrapped = State.S st in
-  match Register.find_opt st_wrapped reg with
+  match R.find_opt st_wrapped reg with
   | Some sti ->
       let st' = state m sti in
       assert (State.compare st_wrapped (State.S st') = 0);
@@ -175,13 +175,16 @@ let rec replace_or_register reg m sti =
       let child = state m childi in
       match equivalent_state reg m child with
       | Some (q, qi) ->
-          let m = M.remove childi m in
           (* Merge word metadata and update [q]. *)
           let q = merge_equivalent_states child q in
-          let m = add m qi q in
-          let m = add m sti (with_last_child st qi) in
-          (Register.remove (State.S st) reg, m)
-      | None -> (Register.add (State.S child) childi reg, m))
+          let m =
+            M.remove childi m |> M.add qi q |> M.add sti (with_last_child st qi)
+          and reg =
+            R.remove (State.S st) reg |> R.remove (State.S child)
+            |> R.add (State.S q) qi
+          in
+          (reg, m)
+      | None -> (R.add (State.S child) childi reg, m))
 
 let add_word_sorted (reg, m) (word, leaf) =
   let prefix_len, last_statei = common_prefix m word in
@@ -190,6 +193,6 @@ let add_word_sorted (reg, m) (word, leaf) =
   (reg, add_suffix m last_statei current_suffix leaf)
 
 let of_sorted_list words =
-  let empty = (Register.empty, M.singleton Id.zero []) in
+  let empty = (R.empty, M.singleton Id.zero []) in
   let reg, m = List.fold_left add_word_sorted empty words in
   snd (replace_or_register reg m Id.zero)
