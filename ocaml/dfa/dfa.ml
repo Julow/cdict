@@ -202,8 +202,11 @@ let numbers_state m =
   in
   fst (map_st m 0 Id.zero)
 
-let of_sorted_list words =
-  let empty = (R.empty, M.singleton Id.zero []) in
-  let reg, m = List.fold_left add_word_sorted empty words in
+let of_sorted_iter iter =
+  let acc = ref (R.empty, M.singleton Id.zero []) in
+  iter (fun word -> acc := add_word_sorted !acc word);
+  let reg, m = !acc in
   let _, m = replace_or_register reg m Id.zero in
   numbers_state m
+
+let of_sorted_list words = of_sorted_iter (fun f -> List.iter f words)

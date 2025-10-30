@@ -53,6 +53,10 @@ val of_sorted_list : string list -> t
 (** Construct a minimal DFA from a lexicographically sorted list. If the list is
     not sorted, the DFA will not be minimal. Duplicated words are removed. *)
 
+val of_sorted_iter : ((string -> unit) -> unit) -> t
+(** Like [of_sorted_list] but takes a partially applied [iter] function instead
+    of a list. *)
+
 val pp : Format.formatter -> t -> unit
 (** Pretty print the internal structure of the DFA. For debugging purposes. *)
 
