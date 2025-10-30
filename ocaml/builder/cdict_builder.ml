@@ -180,26 +180,33 @@ module Buf = struct
   include Open
 end
 
-module Ptr = struct
-  type kind = [ `Prefix | `Branches | `Btree ]
-  type t = Ptr of { kind : kind; offset : int32; number : int; final : bool }
+type kind = [ `Prefix | `Branches | `Btree | `Number ]
 
-  let v ~final ~number kind offset =
-    Ptr { kind; offset = Int32.of_int offset; number; final }
+module Ptr : sig
+  type t
+
+  val v : final:bool -> number:int -> kind -> int -> t
+  val w : Buf.t -> int -> int -> t -> unit
+end = struct
+  type t = int32
 
   let tag_of_kind = function
     | `Prefix -> C.tag_PREFIX
     | `Branches -> C.tag_BRANCHES
     | `Btree -> C.tag_BTREE
+    | `Number -> C.tag_NUMBER
 
-  let to_int32 (Ptr { kind; offset; number; final }) =
+  let v ~final ~number kind offset =
+    let open Int32 in
     let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
-    let number = Int32.(shift_left (of_int number) C.c_PTR_NUMBER_OFFSET) in
-    assert (Int32.(logand number (lognot C.mask_PTR_NUMBER_MASK) = 0l));
-    assert (Int32.(logand offset (lognot C.mask_PTR_OFFSET_MASK) = 0l));
-    Int32.(logor number (logor final_flag (logor (tag_of_kind kind) offset)))
+    assert (number land lnot C.c_PTR_NUMBER_MAX = 0);
+    let number = shift_left (of_int number) C.c_PTR_NUMBER_OFFSET in
+    let offset = of_int offset in
+    assert (logand number (lognot C.mask_PTR_NUMBER_MASK) = 0l);
+    assert (logand offset (lognot C.mask_PTR_OFFSET_MASK) = 0l);
+    logor number (logor final_flag (logor (tag_of_kind kind) offset))
 
-  let w b node_off off t = Buf.w_int32 b node_off off (to_int32 t)
+  let w b node_off off ptr = Buf.w_int32 b node_off off ptr
 end
 
 module Writer = struct
@@ -233,24 +240,40 @@ module Writer = struct
     off
 
   let rec write_node seen ?align b nodes { Optimized.final; number; next } =
-    let kind, offset =
-      match Seen.find_opt next !seen with
-      | Some node -> node
-      | None ->
-          let node =
-            match Optimized.find next nodes with
-            (* | exception Not_found -> . *)
-            | Optimized.Prefix (p, tr) ->
-                (`Prefix, write_prefix_node seen ?align b nodes p tr)
-            | Branches branches ->
-                (`Branches, write_branches_node seen ?align b nodes branches)
-            | Btree (labels, branches) ->
-                (`Btree, write_btree_node seen ?align b nodes labels branches)
-          in
-          seen := Seen.add next node !seen;
-          node
+    write_node' seen ?align b nodes ~final ~number next
+
+  and write_node' seen ?align b nodes ~final ~number next =
+    if number > C.c_PTR_NUMBER_MAX then
+      write_number_node seen b nodes ~final ~number next
+    else
+      let kind, offset =
+        match Seen.find_opt next !seen with
+        | Some node -> node
+        | None ->
+            let node =
+              match Optimized.find next nodes with
+              (* | exception Not_found -> . *)
+              | Optimized.Prefix (p, tr) ->
+                  (`Prefix, write_prefix_node seen ?align b nodes p tr)
+              | Branches branches ->
+                  (`Branches, write_branches_node seen ?align b nodes branches)
+              | Btree (labels, branches) ->
+                  (`Btree, write_btree_node seen ?align b nodes labels branches)
+            in
+            seen := Seen.add next node !seen;
+            node
+      in
+      Ptr.v ~final ~number kind offset
+
+  and write_number_node seen b nodes ~final ~number next =
+    let off = alloc b S.number_t in
+    let next =
+      let number = number - C.c_PTR_NUMBER_MAX in
+      assert (number > 0);
+      write_node' seen b nodes ~final ~number next
     in
-    Ptr.v ~final ~number kind offset
+    Ptr.w b off O.number_t_next next;
+    Ptr.v ~final:false ~number:C.c_PTR_NUMBER_MAX `Number off
 
   and write_prefix_node seen ?align b nodes p next =
     let off = alloc ?align b S.prefix_t in
@@ -394,6 +417,21 @@ let stats ppf ((tree, _root_id), leaves) =
     (hist_int (fun (_, b) -> Array.length b))
     btrees;
   Format.fprintf ppf "@[<v 2>Leaves: %d@]@\n" (Array.length leaves);
+  let transitions = List.concat ranges in
+  Format.fprintf ppf
+    "@[<v 2>Transitions: %d@ %a@ With numbers length in bytes: %a@ With char:@ \
+     %a@]@\n"
+    (List.length transitions)
+    (hist_str (fun (_, { final; _ }) -> if final then "Final" else "Non-final"))
+    transitions
+    (hist_int (fun (_, { number; _ }) ->
+         if number <= 0xFF then 1
+         else if number <= 0xFFFF then 2
+         else if number <= 0xFFFFFF then 3
+         else 4))
+    transitions
+    (hist_str (fun (c, _) -> String.make 1 c))
+    transitions;
   ()
 
 let rec pp nodes ppf id =

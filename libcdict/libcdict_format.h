@@ -21,7 +21,7 @@ of type ptr_or_null_t).
 
 #include <stdint.h>
 
-typedef int32_t ptr_t;
+typedef uint32_t ptr_t;
 typedef ptr_t ptr_or_null_t;
 
 typedef enum
@@ -29,16 +29,19 @@ typedef enum
   BRANCHES = 0b000,
   PREFIX = 0b001,
   BTREE = 0b010,
+  NUMBER = 0b011,
 } kind_t;
 
-#define PTR_KIND_MASK 0b011
-#define PTR_FLAGS_MASK 0b100
-#define PTR_NUMBER_MASK 0xFF000000
-#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
+#define PTR_NUMBER_MAX 0xFFu
 #define PTR_NUMBER_OFFSET 24
 
+#define PTR_KIND_MASK 0b011u
+#define PTR_FLAGS_MASK 0b100u
+#define PTR_NUMBER_MASK (PTR_NUMBER_MAX << PTR_NUMBER_OFFSET)
+#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
+
 /** Whether the pointer is a final transition. */
-#define PTR_FLAG_FINAL 0b100
+#define PTR_FLAG_FINAL 0b100u
 
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
 #define PTR_NUMBER(PTR) (((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
@@ -116,6 +119,21 @@ typedef struct
   char labels[BTREE_NODE_LENGTH];
   ptr_t next[];
 } btree_t;
+
+/** NUMBER nodes (size = 4 bytes)
+
+A non-branching node that stores a pointer to a next state. It is used to
+workaround the limited storage for the 'number' field in pointers by adding an
+indirection.
+This node doesn't consume any prefix.
+
+This node is never final.
+*/
+
+typedef struct
+{
+  ptr_t next;
+} number_t;
 
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 
