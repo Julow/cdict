@@ -10,16 +10,31 @@ let create words =
   (* Format.pp_print_flush Format.err_formatter (); *)
   Cdict.of_string data
 
+let fpf = Format.fprintf
+
+let expect ?(msg = "") pp_a got expected =
+  if got <> expected then (
+    Format.eprintf
+      "%sExpected: {@\n@[<v>%a@]@\n} but got: {@\n@[<v>%a@]@\n}@\n%!" msg pp_a
+      expected pp_a got;
+    failwith "Test failure")
+
+let pp_leaf_opt ppf = function
+  | Some leaf -> fpf ppf "%x" leaf
+  | None -> fpf ppf "<not found>"
+
+let pp_word_leaf_opt ppf (w, l) = fpf ppf "%s %a" w pp_leaf_opt l
+let pp_list fmt = Format.(pp_print_list ~pp_sep:pp_print_space) fmt
+
 let assert_found d word expected_leaf =
-  match Cdict.find d word with
-  | Some leaf ->
-      if leaf <> expected_leaf then
-        fail "Expected %d but got %d for word %S" expected_leaf leaf word
-  | None -> fail "Expected word %S not found" word
+  expect ~msg:"Find returned unexpected value. " pp_leaf_opt (Cdict.find d word)
+    (Some expected_leaf)
 
 let create_and_assert words =
   let d = create words in
-  List.iteri (fun i w -> assert_found d w i) words;
+  expect ~msg:"create_and_assert. " (pp_list pp_word_leaf_opt)
+    (List.map (fun w -> (w, Cdict.find d w)) words)
+    (List.mapi (fun i w -> (w, Some i)) words);
   d
 
 let assert_not_found d word =
@@ -29,24 +44,22 @@ let assert_not_found d word =
 
 (* Fruit test *)
 let () =
-  let d = create [ "pomme"; "poire"; "coing"; "poireau" ] in
-  assert_found d "coing" 2;
-  (* Own branch from the root *)
-  assert_found d "poire" 1;
-  (* Branch with leaf *)
-  assert_found d "poireau" 3
+  let _ = create_and_assert [ "pomme"; "poire"; "coing"; "poireau" ] in
+  ()
 
 (* One empty word *)
 let () =
+  (* The DFA based dictionary doesn't support the empty word. *)
   let d = create [ "" ] in
-  assert_found d "" 0;
+  assert_not_found d "";
   assert_not_found d "a"
 
 (* One word *)
 let () =
   let d = create [ "a" ] in
   assert_found d "a" 0;
-  assert_not_found d ""
+  assert_not_found d "";
+  assert_not_found d "b"
 
 (* Empty dict *)
 let () =

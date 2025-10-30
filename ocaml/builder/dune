@@ -1,6 +1,7 @@
 (library
  (public_name cdict.builder)
- (name cdict_builder))
+ (name cdict_builder)
+ (libraries dfa))
 
 (rule
  (with-stdout-to

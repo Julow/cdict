@@ -1,37 +1,5 @@
 open Constants
 
-module Trie = struct
-  (** A simple trie implementation that can be created from a list of words. *)
-
-  type 'a t = { leaf : 'a option; branches : (char * 'a t) list }
-  (** Branches are sorted in lexicographically ascending order. *)
-
-  let group_by_first_char prefix_len words =
-    let rec start acc leaf = function
-      | [] -> (List.rev acc, leaf)
-      | (w, leaf) :: tl when String.length w <= prefix_len ->
-          start acc (Some leaf) tl
-      | ((w, _) as w') :: tl -> node acc leaf w.[prefix_len] [ w' ] tl
-    and node acc leaf char group = function
-      | ((w, _) as w') :: tl
-        when String.length w > prefix_len && w.[prefix_len] = char ->
-          node acc leaf char (w' :: group) tl
-      | lst -> start ((char, List.rev group) :: acc) leaf lst
-    in
-    start [] None words
-
-  let rec t_of_list prefix_len words =
-    let branches, leaf = group_by_first_char prefix_len words in
-    let branches = List.map (t_of_branch (prefix_len + 1)) branches in
-    { leaf; branches }
-
-  and t_of_branch prefix_len (c, words) = (c, t_of_list prefix_len words)
-
-  let of_list words =
-    List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) words
-    |> t_of_list 0
-end
-
 module Optimized = struct
   (** Encode a trie into a form closer to libcdict's format, taking advantages
       of possible optimisations. *)
@@ -39,14 +7,12 @@ module Optimized = struct
   module Id : sig
     type t = private int
 
-    val zero : t
     val fresh : unit -> t
     val compare : t -> t -> int
   end = struct
     type t = int
 
     let _uniq = ref 0
-    let zero = 0
 
     let fresh () =
       incr _uniq;
@@ -57,35 +23,29 @@ module Optimized = struct
 
   module IdMap = Map.Make (Id)
 
-  type 'a branches = {
-    b_next : 'a branches option;  (** Sorted *)
-    b_branches : (char * Id.t) list;  (** Sorted *)
+  type tr = { number : int; final : bool; next : Id.t }
+
+  type branches = {
+    b_next : branches option;  (** Sorted *)
+    b_branches : (char * tr) list;  (** Sorted *)
   }
 
-  type 'a node =
-    | Leaf of 'a
-    | Branches of 'a branches
-    | Btree of string * Id.t array  (** Labels encodes a binary tree. *)
-    | Prefix of string * Id.t  (** 1 to 3 bytes prefix *)
-    | With_leaf of 'a * Id.t
+  type node =
+    | Branches of branches
+    | Btree of string * tr array  (** Labels encodes a binary tree. *)
+    | Prefix of string * tr  (** Up to [C.c_PREFIX_NODE_LENGTH] bytes prefix *)
 
-  type 'a t = 'a node IdMap.t
+  type t = node IdMap.t * Id.t
+  (** Second argument is the root id. *)
 
-  let add ?(node_id = Id.fresh ()) ids node =
-    (IdMap.add node_id node ids, node_id)
+  let add ids node =
+    let id = Id.fresh () in
+    (IdMap.add id node ids, id)
 
   let find = IdMap.find
 
   let rec branches_to_list b =
     b.b_branches :: Option.fold ~none:[] ~some:branches_to_list b.b_next
-
-  let rec fold_prefix prefix trie =
-    if String.length prefix >= C.c_PREFIX_NODE_LENGTH then (prefix, trie)
-    else
-      match trie with
-      | { Trie.leaf = None; branches = [ (c, next) ] } ->
-          fold_prefix (prefix ^ String.make 1 c) next
-      | _ -> (prefix, trie)
 
   (** Split a branches node if it contains a hole bigger than this. *)
   let branch_partition_cutoff =
@@ -134,52 +94,70 @@ module Optimized = struct
             if i < Array.length tree then fst tree.(i) else '\000')
       in
       let branches = Array.map snd tree in
-      Some (Btree (labels, branches))
+      Some (labels, branches)
 
-  (** Take the id as argument for making sure that the root node has id [0] and
-      that branch nodes have an id smaller than their children. *)
-  let rec node_of_trie ?node_id ids = function
-    | { Trie.leaf = Some leaf; branches = [] } -> add ?node_id ids (Leaf leaf)
-    | { leaf = Some leaf; branches } ->
-        let ids, next = node_of_branches ids branches in
-        add ?node_id ids (With_leaf (leaf, next))
-    | { leaf = None; branches } -> node_of_branches ?node_id ids branches
+  module Seen = Dfa.Id.Map
+  open Dfa
 
-  and node_of_branches ?node_id ids = function
-    | [ (c, next) ] ->
-        let prefix, next = fold_prefix (String.make 1 c) next in
-        let ids, next = node_of_trie ids next in
-        add ?node_id ids (Prefix (prefix, next))
-    | branches ->
+  let rec fold_prefix dfa prefix next number final =
+    if String.length prefix >= C.c_PREFIX_NODE_LENGTH || number > 0 || final
+    then (prefix, next, number, final)
+    else
+      match state dfa next with
+      | [ { c = '\x00'; _ } ] | [] | _ :: _ :: _ -> (prefix, next, number, final)
+      | [ { c; next; number = n; final } ] ->
+          let prefix = prefix ^ String.make 1 c in
+          fold_prefix dfa prefix next (number + n) final
+
+  let rec node_of_dfa seen ids dfa sti =
+    match Seen.find_opt sti !seen with
+    | Some id -> (ids, id)
+    | None ->
+        let ids, id = node_of_dfa_uncached seen ids dfa (Dfa.state dfa sti) in
+        seen := Seen.add sti id !seen;
+        (ids, id)
+
+  and node_of_dfa_uncached seen ids dfa = function
+    | [ { c; next; number; final } ] ->
+        let prefix, next, number, final =
+          fold_prefix dfa (String.make 1 c) next number final
+        in
+        let ids, next = node_of_dfa seen ids dfa next in
+        let tr = { next; number; final } in
+        add ids (Prefix (prefix, tr))
+    | trs ->
         let ids, branches =
           List.fold_right
-            (fun (c, next) (ids, acc) ->
-              let ids, next = node_of_trie ids next in
-              (ids, (c, next) :: acc))
-            branches (ids, [])
+            (fun { c; next; number; final } (ids, acc) ->
+              let ids, next = node_of_dfa seen ids dfa next in
+              let tr = { next; number; final } in
+              (ids, (c, tr) :: acc))
+            trs (ids, [])
         in
         assert (branches = List.sort compare branches);
         let branches = optimise_branches [] branches in
         let node =
           match maybe_branches_to_btree branches with
-          | Some n -> n
+          | Some (cs, branches) -> Btree (cs, branches)
           | None -> Branches branches
         in
-        add ?node_id ids node
+        add ids node
 
-  let of_trie trie = fst (node_of_trie ~node_id:Id.zero IdMap.empty trie)
+  let of_dfa dfa =
+    let seen = ref Seen.empty in
+    node_of_dfa_uncached seen IdMap.empty dfa (Dfa.root_state dfa)
 end
 
-type 'a t = 'a Optimized.t
+type 'a t = Optimized.t * 'a array
 
-let of_list words = Trie.of_list words |> Optimized.of_trie
-
-(*
-
-Trie.of_list ["manges", 1; "manger", 2; "mangue", 3; "structure", 4; "structures", 5]
-|> Optimized.of_trie |> Optimized.IdMap.bindings ;;
-
-*)
+let of_list words =
+  let words = Array.of_list words in
+  Array.sort (fun (a, _) (b, _) -> String.compare a b) words;
+  let dfa =
+    Dfa.of_sorted_iter (fun f -> Array.iter (fun (w, _) -> f w) words)
+  in
+  let leaves = Array.map snd words in
+  (Optimized.of_dfa dfa, leaves)
 
 module Buf = struct
   type t = { mutable b : bytes; mutable end_ : int }
@@ -203,27 +181,23 @@ module Buf = struct
 end
 
 module Ptr = struct
-  type kind = [ `Leaf | `Prefix | `Branches | `Btree | `With_leaf ]
-  type t = Ptr of kind * int32
+  type kind = [ `Prefix | `Branches | `Btree ]
+  type t = Ptr of { kind : kind; offset : int32; number : int; final : bool }
 
-  let v kind ptr = Ptr (kind, Int32.of_int ptr)
-  let v_leaf v = Ptr (`Leaf, Int32.(shift_left (of_int v) 3))
-  (* let kind (Ptr (k, _)) = k *)
-  (* let offset (Ptr (_, p)) = Int32.to_int p *)
-  (* let with_kind kind (Ptr (_, p)) = Ptr (kind, p) *)
-  (* let tag (Ptr (kind, _)) = Int32.to_int (tag_of_kind kind) *)
+  let v ~final ~number kind offset =
+    Ptr { kind; offset = Int32.of_int offset; number; final }
 
   let tag_of_kind = function
-    | `Leaf -> C.tag_LEAF
     | `Prefix -> C.tag_PREFIX
     | `Branches -> C.tag_BRANCHES
     | `Btree -> C.tag_BTREE
-    | `With_leaf -> C.tag_WITH_LEAF
 
-  let to_int32 (Ptr (kind, ptr)) =
-    if not Int32.(logand ptr C.c_PTR_KIND_MASK = 0l) then
-      failwith "Writing misaligned pointer";
-    Int32.(logor (tag_of_kind kind) ptr)
+  let to_int32 (Ptr { kind; offset; number; final }) =
+    let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
+    let number = Int32.(shift_left (of_int number) C.c_PTR_NUMBER_OFFSET) in
+    assert (Int32.(logand number (lognot C.mask_PTR_NUMBER_MASK) = 0l));
+    assert (Int32.(logand offset (lognot C.mask_PTR_OFFSET_MASK) = 0l));
+    Int32.(logor number (logor final_flag (logor (tag_of_kind kind) offset)))
 
   let w b node_off off t = Buf.w_int32 b node_off off (to_int32 t)
 end
@@ -238,6 +212,8 @@ module Writer = struct
   let[@inline] align4 offset =
     let down = offset land lnot 3 in
     if down = offset then down else down + 4
+
+  module Seen = Optimized.IdMap
 
   (** The [align] (defaults to [true]) option allows writing unaligned nodes.
       Unaligned node cannot be referenced with a pointer and [Ptr.w] will raise
@@ -256,42 +232,38 @@ module Writer = struct
       b.b <- newb);
     off
 
-  let rec write_node ?align b ~alloc_leaf nodes id =
-    match Optimized.find id nodes with
-    (* | exception Not_found -> . *)
-    | Optimized.Leaf leaf ->
-        (* Leaf nodes cannot be misaligned because pointers to it must be
-           written in the dictionary (the pointer is the leaf data). *)
-        if align = Some false then failwith "Misaligned leaf node";
-        alloc_leaf leaf
-    | Prefix (p, next) -> write_prefix_node ?align b ~alloc_leaf nodes p next
-    | Branches branches ->
-        write_branches_node ?align b ~alloc_leaf nodes branches
-    | Btree (labels, branches) ->
-        write_btree_node ?align b ~alloc_leaf nodes labels branches
-    | With_leaf (leaf, next) ->
-        write_with_leaf ?align b ~alloc_leaf nodes leaf next
+  let rec write_node seen ?align b nodes { Optimized.final; number; next } =
+    let kind, offset =
+      match Seen.find_opt next !seen with
+      | Some node -> node
+      | None ->
+          let node =
+            match Optimized.find next nodes with
+            (* | exception Not_found -> . *)
+            | Optimized.Prefix (p, tr) ->
+                (`Prefix, write_prefix_node seen ?align b nodes p tr)
+            | Branches branches ->
+                (`Branches, write_branches_node seen ?align b nodes branches)
+            | Btree (labels, branches) ->
+                (`Btree, write_btree_node seen ?align b nodes labels branches)
+          in
+          seen := Seen.add next node !seen;
+          node
+    in
+    Ptr.v ~final ~number kind offset
 
-  and write_with_leaf ?align b ~alloc_leaf nodes leaf next =
-    let off = alloc ?align b S.with_leaf_t in
-    let next_ptr = write_node b ~alloc_leaf nodes next in
-    let leaf_ptr = alloc_leaf leaf in
-    Ptr.w b off O.with_leaf_t_leaf leaf_ptr;
-    Ptr.w b off O.with_leaf_t_next next_ptr;
-    Ptr.v `With_leaf off
-
-  and write_prefix_node ?align b ~alloc_leaf nodes p next =
+  and write_prefix_node seen ?align b nodes p next =
     let off = alloc ?align b S.prefix_t in
-    let next_ptr = write_node b ~alloc_leaf nodes next in
+    let next_ptr = write_node seen b nodes next in
     assert (String.length p <= C.c_PREFIX_NODE_LENGTH);
     w_bzero b off O.prefix_t_prefix C.c_PREFIX_NODE_LENGTH;
     for i = 0 to String.length p - 1 do
       w_int8 b off (O.prefix_t_prefix + i) (Char.code p.[i])
     done;
     Ptr.w b off O.prefix_t_next next_ptr;
-    Ptr.v `Prefix off
+    off
 
-  and write_branches_node ?align b ~alloc_leaf nodes brs =
+  and write_branches_node seen ?align b nodes brs =
     let min_value, max_value =
       match brs.b_branches with
       | [] -> (0, 0)
@@ -309,38 +281,43 @@ module Writer = struct
     let has_next =
       match brs.b_next with
       | Some next ->
-          ignore (write_branches_node ~align:false b ~alloc_leaf nodes next);
+          ignore (write_branches_node seen ~align:false b nodes next);
           1
       | None -> 0
     in
     List.iter
       (fun (c, id) ->
         let c = Char.code c in
-        Ptr.w b off
-          (branch_off (c - min_value))
-          (write_node b ~alloc_leaf nodes id))
+        Ptr.w b off (branch_off (c - min_value)) (write_node seen b nodes id))
       brs.b_branches;
     w_int8 b off O.branches_t_low min_value;
     w_int8 b off O.branches_t_length len;
     w_int8 b off O.branches_t_has_next has_next;
-    Ptr.v `Branches off
+    off
 
-  and write_btree_node ?align b ~alloc_leaf nodes labels brs =
+  and write_btree_node seen ?align b nodes labels brs =
     let off = alloc ?align b (S.btree_t + (Array.length brs * S.ptr_t)) in
     let branch_off i = S.btree_t + (i * S.ptr_t) in
     w_bzero b off O.btree_t_labels C.c_BTREE_NODE_LENGTH;
     w_str b off O.btree_t_labels labels;
     Array.iteri
-      (fun i n -> Ptr.w b off (branch_off i) (write_node b ~alloc_leaf nodes n))
+      (fun i n -> Ptr.w b off (branch_off i) (write_node seen b nodes n))
       brs;
-    Ptr.v `Btree off
+    off
 
-  let write_tree b ~encode_leaf nodes =
-    let alloc_leaf leaf = Ptr.v_leaf (encode_leaf leaf) in
+  let write_tree b ~encode_leaf ((nodes, root_id), leaves) =
+    let seen = ref Seen.empty in
     let header_off = alloc b S.header_t in
     assert (header_off = 0);
-    let root_ptr = write_node b ~alloc_leaf nodes Optimized.Id.zero in
-    Ptr.w b header_off O.header_t_root_ptr root_ptr
+    let root_tr = { Optimized.final = false; number = 0; next = root_id } in
+    let root_ptr = write_node seen b nodes root_tr in
+    Ptr.w b header_off O.header_t_root_ptr root_ptr;
+    let leaves_off = alloc b (4 * Array.length leaves) in
+    w_int32 b header_off O.header_t_leaves_off (Int32.of_int leaves_off);
+    Array.iteri
+      (fun i leaf ->
+        w_int32 b leaves_off (4 * i) (Int32.of_int (encode_leaf leaf)))
+      leaves
 end
 
 let to_buf tree ~encode_leaf =
@@ -375,21 +352,15 @@ let hist (type a) to_s key ppf lst =
 let hist_int key ppf lst = hist string_of_int key ppf lst
 let hist_str key ppf lst = hist Fun.id key ppf lst
 
-let stats ppf tree =
+let stats ppf ((tree, _root_id), leaves) =
   let open Optimized in
   let str_of_node_kind = function
     | Prefix _ -> "Prefix"
     | Branches _ -> "Branches"
     | Btree _ -> "Btree"
-    | Leaf _ -> "Leaf"
-    | With_leaf _ -> "With_leaf"
-  in
-  let count f lst =
-    List.fold_left (fun n e -> if f e then n + 1 else n) 0 lst
   in
   let nodes = IdMap.fold (fun _ n acc -> n :: acc) tree [] in
-  Format.fprintf ppf "Nodes: %d@\nLeaf nodes: %d@\n" (List.length nodes)
-    (count (function Leaf _ -> true | _ -> false) nodes);
+  Format.fprintf ppf "Nodes: %d@\n" (List.length nodes);
   let branches =
     List.filter_map (function Branches b -> Some b | _ -> None) nodes
   in
@@ -408,7 +379,7 @@ let stats ppf tree =
   Format.fprintf ppf
     "@[<v 2>Prefix nodes: %d@ Followed by:@ %a@ With size:@ %a@]@\n"
     (List.length prefixes)
-    (hist_str (fun (_, next) -> str_of_node_kind (IdMap.find next tree)))
+    (hist_str (fun (_, tr) -> str_of_node_kind (IdMap.find tr.next tree)))
     prefixes
     (hist_int (fun (p, _) -> String.length p))
     prefixes;
@@ -422,26 +393,17 @@ let stats ppf tree =
     (List.length btrees)
     (hist_int (fun (_, b) -> Array.length b))
     btrees;
-  let with_leafs =
-    List.filter_map
-      (function With_leaf (_, next) -> Some next | _ -> None)
-      nodes
-  in
-  Format.fprintf ppf "@[<v 2>With_leaf nodes: %d@ With next:@ %a@]@\n"
-    (List.length with_leafs)
-    (hist_str (fun next -> str_of_node_kind (IdMap.find next tree)))
-    with_leafs;
+  Format.fprintf ppf "@[<v 2>Leaves: %d@]@\n" (Array.length leaves);
   ()
 
-let rec pp pp_leaf nodes ppf id =
+let rec pp nodes ppf id =
   let open Optimized in
   let fpf fmt = Format.fprintf ppf fmt in
   match IdMap.find id nodes with
-  | Leaf leaf -> fpf "@[<hv 2>Leaf@ %a@]" pp_leaf leaf
   | Branches brs ->
       let rec loop _ brs =
         List.iter
-          (fun (c, id) -> fpf "%c %a@ " c (pp pp_leaf nodes) id)
+          (fun (c, tr) -> fpf "%c %a@ " c (pp nodes) tr.next)
           brs.b_branches;
         match brs.b_next with Some b -> fpf "next@ %a" loop b | None -> ()
       in
@@ -449,16 +411,16 @@ let rec pp pp_leaf nodes ppf id =
   | Btree (labels, brs) ->
       fpf "@[<v 2>Btree@ ";
       for i = 0 to Array.length brs - 1 do
-        fpf "%c %a@ " labels.[i] (pp pp_leaf nodes) brs.(i)
+        fpf "%c %a@ " labels.[i] (pp nodes) brs.(i).next
       done;
       fpf "@]"
   | Prefix (prefix, next) ->
-      fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp pp_leaf nodes) next
-  | With_leaf (leaf, next) ->
-      fpf "@[<v 2>With_leaf@ %a@ %a@]" pp_leaf leaf (pp pp_leaf nodes) next
+      fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp nodes) next.next
 
-let pp pp_leaf ppf nodes =
-  pp pp_leaf nodes ppf Optimized.Id.zero;
-  Format.fprintf ppf "@\n"
+let pp pp_leaf ppf ((nodes, root_id), leaves) =
+  pp nodes ppf root_id;
+  Format.fprintf ppf "@\n@[<v>%a@]@\n"
+    Format.(pp_print_array ~pp_sep:pp_print_space pp_leaf)
+    leaves
 
 module Complete_tree = Complete_tree

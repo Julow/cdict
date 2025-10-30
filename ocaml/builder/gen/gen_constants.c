@@ -28,13 +28,15 @@ int main()
 
   VAL(c_, PREFIX_NODE_LENGTH);
   VAL(c_, BTREE_NODE_LENGTH);
-  VAL_INT32(c_, PTR_KIND_MASK);
-  VAL_INT32(c_, PTR_OFFSET_MASK);
-  VAL_INT32(tag_, LEAF);
+  VAL_INT32(mask_, PTR_KIND_MASK);
+  VAL_INT32(mask_, PTR_FLAGS_MASK);
+  VAL_INT32(mask_, PTR_OFFSET_MASK);
+  VAL_INT32(mask_, PTR_NUMBER_MASK);
+  VAL(c_, PTR_NUMBER_OFFSET);
+  VAL_INT32(flag_, PTR_FLAG_FINAL);
   VAL_INT32(tag_, BRANCHES);
   VAL_INT32(tag_, PREFIX);
   VAL_INT32(tag_, BTREE);
-  VAL_INT32(tag_, WITH_LEAF);
 
   end();
   module("O");
@@ -50,10 +52,8 @@ int main()
   FIELD(btree_t, labels);
   FIELD(btree_t, next);
 
-  FIELD(with_leaf_t, leaf);
-  FIELD(with_leaf_t, next);
-
   FIELD(header_t, root_ptr);
+  FIELD(header_t, leaves_off);
 
   end();
   module("S");
@@ -62,7 +62,6 @@ int main()
   SIZE(branches_t);
   SIZE(prefix_t);
   SIZE(btree_t);
-  SIZE(with_leaf_t);
   SIZE(header_t);
 
   end();

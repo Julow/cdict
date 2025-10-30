@@ -14,6 +14,7 @@ typedef struct
   char const *data;
   size_t size;
   int32_t root_ptr;
+  int32_t const *leaves;
 } cdict_t;
 
 /** Create a in-memory dictionary from a string of a given size. The string is

@@ -26,29 +26,24 @@ typedef ptr_t ptr_or_null_t;
 
 typedef enum
 {
-  LEAF = 0b001,
   BRANCHES = 0b000,
-  PREFIX = 0b010,
-  BTREE = 0b100,
-  WITH_LEAF = 0b011,
+  PREFIX = 0b001,
+  BTREE = 0b010,
 } kind_t;
 
-#define PTR_KIND_MASK 0b111
-#define PTR_OFFSET_MASK ~0b111
+#define PTR_KIND_MASK 0b011
+#define PTR_FLAGS_MASK 0b100
+#define PTR_NUMBER_MASK 0xFF000000
+#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
+#define PTR_NUMBER_OFFSET 24
 
-/** Partial cast to [kind_t]. */
+/** Whether the pointer is a final transition. */
+#define PTR_FLAG_FINAL 0b100
+
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
+#define PTR_NUMBER(PTR) (((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
 #define PTR_OFFSET(PTR) ((PTR) & PTR_OFFSET_MASK)
-
-/** LEAF nodes (size = 0)
-
-Leaf nodes occupie no space in the dictionary, instead the 29 highest bits
-represent arbitrary metadata.
-The presence of a leaf node indicates that the word is present in the
-dictionary.
-*/
-
-#define LEAF_DATA(PTR) ((PTR) >> 3)
+#define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
 
 /** BRANCHES nodes (size = 4 bytes + array)
 
@@ -88,9 +83,10 @@ A single branch, consuming up to 3 bytes from the query.
 The 'prefix' field is interpreted as follow:
 The first byte is always part of the prefix. The next bytes are only part of
 the prefix if they are not NUL, (where XX can be anything, including 0):
-XX 00 00  A 1 byte prefix
-XX ++ 00  A 2 byte prefix
-XX ++ ++  A 3 byte prefix
+XX 00 00 00  A 1 byte prefix
+XX ++ 00 00  A 2 byte prefix
+XX ++ ++ 00  A 3 byte prefix
+XX ++ ++ ++  A 4 byte prefix
 This means that a word containing a long string of NUL byte is very
 inefficiently encoded.
 */
@@ -121,18 +117,6 @@ typedef struct
   ptr_t next[];
 } btree_t;
 
-/** WITH_LEAF nodes (size = 4 bytes)
-
-A node that doesn't consume any prefix and is treated as a leaf if it is
-encountered at the end of the query.
-*/
-
-typedef struct
-{
-  ptr_t leaf;
-  ptr_t next;
-} with_leaf_t;
-
 /** Dictionary header (size = 4 bytes + 4 bytes of padding)
 
 Located at the beginning of the dictionary.
@@ -141,4 +125,5 @@ Located at the beginning of the dictionary.
 typedef struct
 {
   ptr_t root_ptr;
+  int32_t leaves_off;
 } header_t;

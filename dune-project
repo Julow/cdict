@@ -8,7 +8,8 @@
 
 (package
  (name cdict)
- (synopsis "Compact dictionary partially written in C for spell checking."))
+ (synopsis "Compact dictionary partially written in C for spell checking.")
+ (depends dfa))
 
 (package
  (name cdict-tool)
@@ -19,4 +20,4 @@
  (name dfa)
  (synopsis "Construct a minimal DFA that recognizes a list of words.")
  (description
-  "Implements a minimal deterministic finite-state acyclic automaton that recognizes a finite set of words. It works with a 8 bits alphabet and treat words as byte strings. It is based on the algorithm from the paper:\n\nIncremental Construction of Minimal Acyclic Finite-State Automata\nby Jan Daciuk, Stoyan Mihov, Bruce Watson, Richard Watson\nhttps://arxiv.org/pdf/cs/0007009"))
+  "Implements a minimal deterministic finite-state acyclic automaton that recognizes a finite set of words and perfect hashing. It works with a 8 bits alphabet and treat words as byte strings. It is ideal for natural language dictionaries that are constructed once and compiled into a compact representation."))
