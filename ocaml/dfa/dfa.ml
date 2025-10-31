@@ -123,13 +123,13 @@ module R = Map.Make (State)
 
 let common_prefix m word =
   let rec loop id i =
-    if i >= String.length word then (i, id)
+    if i >= String.length word then (i, id, M.find id m)
     else
       let st = M.find id m in
       let c = word.[i] in
       match List.find_opt (fun tr -> tr.c = c) st with
       | Some { next; _ } -> loop next (i + 1)
-      | None -> (i, id)
+      | None -> (i, id, st)
   in
   loop Id.zero 0
 
@@ -140,7 +140,7 @@ let rec with_last_child st q =
   | hd :: tl -> hd :: with_last_child tl q
 
 (** Assumes that no prefix of [suffix] is present in [st]. *)
-let add_suffix m sti suffix =
+let add_suffix m sti st suffix =
   let len = String.length suffix in
   let rec loop m i =
     let (m, next), final =
@@ -153,40 +153,29 @@ let add_suffix m sti suffix =
   in
   if len = 0 then (* Remove a duplicate. *) m
   else
-    let st = M.find sti m in
     let m, tr' = loop m 0 in
     M.add sti (st @ [ tr' ]) m
 
-(** Find a state equivalent to [st] in [reg]. *)
-let equivalent_state reg m st =
-  match R.find_opt st reg with
-  | Some sti ->
-      let st' = M.find sti m in
-      assert (State.compare st st' = 0);
-      Some (st', sti)
-  | None -> None
-
-let rec replace_or_register reg m sti =
-  let st = M.find sti m in
+(** Takes both the state id and the state to avoid unecessary lookups. Returns
+    the updated version of the state. *)
+let rec replace_or_register reg m sti st =
   match list_last st with
-  | None -> (* No children *) (reg, m)
+  | None -> (* No children *) (reg, m, st)
   | Some { c = _; next = childi; _ } -> (
-      let reg, m = replace_or_register reg m childi in
-      let child = M.find childi m in
-      match equivalent_state reg m child with
-      | Some (q, qi) ->
-          let m =
-            m |> M.remove childi |> M.add qi q
-            |> M.add sti (with_last_child st qi)
-          and reg = reg |> R.remove st |> R.remove child |> R.add q qi in
-          (reg, m)
-      | None -> (R.add child childi reg, m))
+      let reg, m, child = replace_or_register reg m childi (M.find childi m) in
+      match R.find_opt child reg with
+      | Some qi when qi = childi -> (reg, m, st)
+      | Some qi ->
+          let st = with_last_child st qi in
+          let m = M.add sti st (M.remove childi m) in
+          (reg, m, st)
+      | None -> (R.add child childi reg, m, st))
 
 let add_word_sorted (reg, m) word =
-  let prefix_len, last_statei = common_prefix m word in
+  let prefix_len, last_statei, last_state = common_prefix m word in
   let _, current_suffix = str_separate word prefix_len in
-  let reg, m = replace_or_register reg m last_statei in
-  (reg, add_suffix m last_statei current_suffix)
+  let reg, m, last_state = replace_or_register reg m last_statei last_state in
+  (reg, add_suffix m last_statei last_state current_suffix)
 
 let numbers_state m =
   let rec map_trs m index acc = function
@@ -206,7 +195,7 @@ let of_sorted_iter iter =
   let acc = ref (R.empty, M.singleton Id.zero []) in
   iter (fun word -> acc := add_word_sorted !acc word);
   let reg, m = !acc in
-  let _, m = replace_or_register reg m Id.zero in
+  let _, m, _ = replace_or_register reg m Id.zero (M.find Id.zero m) in
   numbers_state m
 
 let of_sorted_list words = of_sorted_iter (fun f -> List.iter f words)
