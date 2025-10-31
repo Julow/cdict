@@ -79,16 +79,8 @@ let pp ppf m =
 module State = struct
   type t = state
 
-  (** Compare two states structurally. The [index] field is not compared. *)
-  let compare a b =
-    List.compare
-      (fun a b ->
-        let d = Char.compare a.c b.c in
-        if d <> 0 then d
-        else
-          let d = Id.compare a.next b.next in
-          if d <> 0 then d else Bool.compare a.final b.final)
-      a b
+  let hash = Hashtbl.hash
+  let equal = ( = )
 end
 
 (** The construction algorithm is from the paper:
@@ -118,7 +110,7 @@ end
       The preceding transitions in the traversed nodes are no longer taken into
       account. *)
 
-module R = Map.Make (State)
+module R = Hashtbl.Make (State)
 (** Register *)
 
 let common_prefix m word =
@@ -160,22 +152,24 @@ let add_suffix m sti st suffix =
     the updated version of the state. *)
 let rec replace_or_register reg m sti st =
   match list_last st with
-  | None -> (* No children *) (reg, m, st)
+  | None -> (* No children *) (m, st)
   | Some { c = _; next = childi; _ } -> (
-      let reg, m, child = replace_or_register reg m childi (M.find childi m) in
-      match R.find_opt child reg with
-      | Some qi when qi = childi -> (reg, m, st)
+      let m, child = replace_or_register reg m childi (M.find childi m) in
+      match R.find_opt reg child with
+      | Some qi when qi = childi -> (m, st)
       | Some qi ->
           let st = with_last_child st qi in
           let m = M.add sti st (M.remove childi m) in
-          (reg, m, st)
-      | None -> (R.add child childi reg, m, st))
+          (m, st)
+      | None ->
+          R.add reg child childi;
+          (m, st))
 
-let add_word_sorted (reg, m) word =
+let add_word_sorted reg m word =
   let prefix_len, last_statei, last_state = common_prefix m word in
   let _, current_suffix = str_separate word prefix_len in
-  let reg, m, last_state = replace_or_register reg m last_statei last_state in
-  (reg, add_suffix m last_statei last_state current_suffix)
+  let m, last_state = replace_or_register reg m last_statei last_state in
+  add_suffix m last_statei last_state current_suffix
 
 let numbers_state m =
   let rec map_trs m index acc = function
@@ -192,10 +186,11 @@ let numbers_state m =
   fst (map_st m 0 Id.zero)
 
 let of_sorted_iter iter =
-  let acc = ref (R.empty, M.singleton Id.zero []) in
-  iter (fun word -> acc := add_word_sorted !acc word);
-  let reg, m = !acc in
-  let _, m, _ = replace_or_register reg m Id.zero (M.find Id.zero m) in
+  let reg = R.create 4096 in
+  let acc = ref (M.singleton Id.zero []) in
+  iter (fun word -> acc := add_word_sorted reg !acc word);
+  let m = !acc in
+  let m, _ = replace_or_register reg m Id.zero (M.find Id.zero m) in
   numbers_state m
 
 let of_sorted_list words = of_sorted_iter (fun f -> List.iter f words)
