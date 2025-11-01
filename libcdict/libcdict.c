@@ -86,6 +86,13 @@ static int cdict_find_btree(void const *data, int32_t off,
   return NOT_FOUND;
 }
 
+static int cdict_find_number(void const *data, int32_t off,
+    char const *word, char const *end, int index)
+{
+  number_t const *n = data + off;
+  return cdict_find_node(data, n->next, word, end, index + n->number);
+}
+
 static int cdict_find_node(void const *data, ptr_t ptr,
     char const *word, char const *end, int index)
 {
@@ -104,8 +111,7 @@ static int cdict_find_node(void const *data, ptr_t ptr,
     case BRANCHES: return cdict_find_branches(data, off, word, end, index);
     case PREFIX: return cdict_find_prefix(data, off, word, end, index);
     case BTREE: return cdict_find_btree(data, off, word, end, index);
-    case NUMBER: return cdict_find_node(data,
-                     ((number_t const*)(data + off))->next, word, end, index);
+    case NUMBER: return cdict_find_number(data, off, word, end, index);
     default: return NOT_FOUND;
   }
 }

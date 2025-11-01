@@ -132,6 +132,7 @@ This node is never final.
 
 typedef struct
 {
+  int32_t number;
   ptr_t next;
 } number_t;
 

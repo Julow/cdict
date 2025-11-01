@@ -57,6 +57,7 @@ int main()
   FIELD(header_t, root_ptr);
   FIELD(header_t, leaves_off);
 
+  FIELD(number_t, number);
   FIELD(number_t, next);
 
   end();
