@@ -4,14 +4,14 @@
   Done.
 
   $ ls -sh dict
-  112K dict
+  84K dict
 
   $ cdict-tool query dict type module function value match
-  found: "type" freq=2070
-  found: "module" freq=1013
-  found: "function" freq=738
-  found: "value" freq=746
-  found: "match" freq=247
+  found: "type" freq=15
+  found: "module" freq=15
+  found: "function" freq=15
+  found: "value" freq=15
+  found: "match" freq=15
 
   $ cdict-tool query dict overload enum defensive coding
   not found: "overload"
@@ -55,4 +55,7 @@
     With next:
     | Branches: 64   | Btree: 42   | Prefix: 27   |
     With final: | Final: 86   | Non-final: 47   |
-  Leaves: 7984
+  Freq: 7984
+    With value:
+    |  0: 2611 |  5: 1156 |  7: 666  |  8: 453  |  9: 342  | 10: 281 
+    | 11: 531  | 12: 490  | 13: 468  | 14: 492  | 15: 494  |

@@ -14,15 +14,27 @@ typedef struct
   char const *data;
   size_t size;
   int32_t root_ptr;
-  int32_t const *leaves;
+  uint8_t const *freq;
 } cdict_t;
 
 /** Create a in-memory dictionary from a string of a given size. The string is
     not copied and must remain valid until the dictionary stops being used. */
 cdict_t cdict_of_string(char const *data, int size);
 
-/** Lookup the given word of the given size in the dictionary. Returns [true]
-    if the word is in the dictionary, [false] otherwise.
-    If the function returned [true] and [leaf] is not NULL, the leaf data is
-    written at [leaf]. */
-bool cdict_find(cdict_t const *dict, char const *word, int word_size, int32_t *leaf);
+/** Return value of [cdict_find]. */
+typedef struct
+{
+  bool found; /** Whether the query is recognized. */
+  int index;
+  /** Unique index of the recognized word or [-1] if the query is not
+      recognized. Find the corresponding freq at [dict->freq[index]]. */
+} cdict_result_t;
+
+/** Lookup the given word of the given size in the dictionary.
+    Write its result to [result]. */
+void cdict_find(cdict_t const *dict, char const *word, int word_size,
+    cdict_result_t *result);
+
+/** Frequency associated to a word. [index] is the corresponding field in
+    [cdict_result_t]. */
+int cdict_freq(cdict_t const *dict, int index);

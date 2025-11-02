@@ -17,6 +17,24 @@ static struct custom_operations const cdict_t_ops = {
   custom_fixed_length_default
 };
 
+// C to OCaml
+static value alloc_result(cdict_result_t const *r)
+{
+  CAMLparam0();
+  CAMLlocal1(v);
+  v = caml_alloc_tuple(3);
+  Store_field(v, 0, Val_bool(r->found));
+  Store_field(v, 1, Val_int(r->index));
+  CAMLreturn(v);
+}
+
+// OCaml to C
+static void result_of_value(value v, cdict_result_t *dst)
+{
+  dst->found = Bool_val(Field(v, 0));
+  dst->index = Int_val(Field(v, 1));
+}
+
 value cdict_of_string_ocaml(value str)
 {
   CAMLparam1(str);
@@ -34,11 +52,14 @@ value cdict_of_string_ocaml(value str)
 value cdict_find_ocaml(value dict, value str)
 {
   CAMLparam2(dict, str);
-  CAMLlocal1(r);
-  r = Val_none;
-  int leaf = 0;
+  cdict_result_t result;
   int s_len = caml_string_length(str);
-  if (cdict_find(CDICT_VAL(dict), String_val(str), s_len, &leaf))
-    r = caml_alloc_some(Val_int(leaf));
-  CAMLreturn(r);
+  cdict_find(CDICT_VAL(dict), String_val(str), s_len, &result);
+  CAMLreturn(alloc_result(&result));
+}
+
+value cdict_freq_ocaml(value dict, value index)
+{
+  CAMLparam2(dict, index);
+  CAMLreturn(Val_int(cdict_freq(CDICT_VAL(dict), Int_val(index))));
 }

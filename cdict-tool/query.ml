@@ -7,13 +7,13 @@ let queries_from_file = function
   | None -> []
 
 let query ~quiet dict q =
-  match Cdict.find dict q with
-  | Some freq ->
-      if not quiet then Printf.printf "found: %S freq=%d\n" q freq;
-      0
-  | None ->
-      if not quiet then Printf.printf "not found: %S\n" q;
-      1
+  let r : Cdict.result = Cdict.find dict q in
+  if not quiet then
+    if r.found then
+      let freq = Cdict.freq dict r.index in
+      Printf.printf "found: %S freq=%d\n" q freq
+    else Printf.printf "not found: %S\n" q;
+  if r.found then 0 else 1
 
 let main quiet from_file dict_fname queries =
   let dict = open_dict dict_fname in

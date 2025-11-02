@@ -5,19 +5,18 @@ type 'a t
     metadata attached. This stores the entire dictionary in memory, in a
     space-inefficient way. *)
 
-val of_list : (string * 'a) list -> 'a t
+val of_list : freq:('a -> int) -> (string * 'a) list -> 'a t
 (** Construct a dictionary from a list. *)
 
-val output : 'a t -> encode_leaf:('a -> int) -> Out_channel.t -> unit
-(** [encode_leaf] encode tree leaves into a 29-bits integer. *)
+val output : 'a t -> Out_channel.t -> unit
 
-val to_string : 'a t -> encode_leaf:('a -> int) -> string
+val to_string : 'a t -> string
 (** Like [output] but write into a string in memory. *)
 
 val stats : Format.formatter -> 'a t -> unit
 (** Print various stats for debugging and testing purposes. *)
 
-val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+val pp : Format.formatter -> 'a t -> unit
 
 (**/**)
 
@@ -28,4 +27,13 @@ module Complete_tree : sig
 
   val of_sorted_list : 'a list -> 'a t
   val to_array : 'a t -> 'a array
+end
+
+module K_medians : sig
+  val k_medians :
+    'a array ->
+    int ->
+    compare:('a -> 'a -> int) ->
+    renumber:('a -> int -> 'b) ->
+    'b array
 end

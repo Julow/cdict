@@ -80,7 +80,7 @@ typedef struct
     appears twice. */
 #define BRANCHES_NEXT(B_PTR) (((void*)(B_PTR)) + BRANCHES_SIZE(*(B_PTR)))
 
-/** PREFIX nodes (size = 4 bytes)
+/** PREFIX nodes (size = 8 bytes)
 
 A single branch, consuming up to 3 bytes from the query.
 The 'prefix' field is interpreted as follow:
@@ -120,7 +120,7 @@ typedef struct
   ptr_t next[];
 } btree_t;
 
-/** NUMBER nodes (size = 4 bytes)
+/** NUMBER nodes (size = 8 bytes)
 
 A non-branching node that stores a pointer to a next state. It is used to
 workaround the limited storage for the 'number' field in pointers by adding an
@@ -136,7 +136,7 @@ typedef struct
   ptr_t next;
 } number_t;
 
-/** Dictionary header (size = 4 bytes + 4 bytes of padding)
+/** Dictionary header (size = 8 bytes)
 
 Located at the beginning of the dictionary.
 */
@@ -144,5 +144,6 @@ Located at the beginning of the dictionary.
 typedef struct
 {
   ptr_t root_ptr;
-  int32_t leaves_off;
+  int32_t freq_off;
+  /** Offset to the 4-bits integer array storing the frequency of each words. */
 } header_t;

@@ -156,16 +156,69 @@ module Optimized = struct
     node_of_dfa_uncached seen IdMap.empty dfa (Dfa.root_state dfa)
 end
 
-type 'a t = Optimized.t * 'a array
+module Freq : sig
+  (** Encode an array of frequency into a 4 bits integer array using linear
+      interpolation, losing precision. *)
 
-let of_list words =
+  type t = private string
+
+  val of_int_array : int array -> t
+
+  val size : t -> int
+  (** Size in bytes *)
+
+  val get : t -> int -> int
+  (** Get the frequency at the specified index. *)
+
+  val to_int_list : t -> int list
+  (** Append an extra [0] at the end if the number of frequency was originally
+      odd. *)
+end = struct
+  type t = string
+
+  let of_int_array_raw freq =
+    let len = Array.length freq in
+    let s = Bytes.create ((len + 1) / 2) in
+    for f_i = 0 to len - 1 do
+      let s_i = f_i / 2 in
+      let f =
+        let f = freq.(f_i) land 0xF in
+        if f_i land 1 = 0 then f else (f lsl 4) lor Bytes.get_uint8 s s_i
+      in
+      Bytes.set_uint8 s s_i f
+    done;
+    Bytes.unsafe_to_string s
+
+  let of_int_array freq =
+    let freq_compressed =
+      (* Compute the 0x10 medians and replace every frequencies by the cluster
+         index they are assigned to. This compresses frequencies to a 4-bits
+         number by loosing information. *)
+      K_medians.k_medians freq 0x10 ~compare:Int.compare ~renumber:(fun _ c ->
+          c)
+    in
+    of_int_array_raw freq_compressed
+
+  let size = String.length
+
+  let get t i =
+    let c = Char.code t.[i / 2] in
+    let c = if i land 1 = 0 then c else c lsr 4 in
+    c land 0xF
+
+  let to_int_list t = List.init (size t * 2) (get t)
+end
+
+type 'a t = Optimized.t * Freq.t
+
+let of_list ~freq words =
   let words = Array.of_list words in
   Array.sort (fun (a, _) (b, _) -> String.compare a b) words;
   let dfa =
     Dfa.of_sorted_iter (fun f -> Array.iter (fun (w, _) -> f w) words)
   in
-  let leaves = Array.map snd words in
-  (Optimized.of_dfa dfa, leaves)
+  let freq = Freq.of_int_array (Array.map (fun (_, data) -> freq data) words) in
+  (Optimized.of_dfa dfa, freq)
 
 module Buf = struct
   type t = { mutable b : bytes; mutable end_ : int }
@@ -332,33 +385,25 @@ module Writer = struct
       brs;
     off
 
-  let write_tree b ~encode_leaf ((nodes, root_id), leaves) =
+  let write_tree b ((nodes, root_id), freq) =
     let seen = ref Seen.empty in
     let header_off = alloc b S.header_t in
     assert (header_off = 0);
     let root_tr = { Optimized.final = false; number = 0; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     Ptr.w b header_off O.header_t_root_ptr root_ptr;
-    let leaves_off = alloc b (4 * Array.length leaves) in
-    w_int32 b header_off O.header_t_leaves_off (Int32.of_int leaves_off);
-    Array.iteri
-      (fun i leaf ->
-        w_int32 b leaves_off (4 * i) (Int32.of_int (encode_leaf leaf)))
-      leaves
+    let freq_off = alloc b (Freq.size freq) in
+    w_int32 b header_off O.header_t_freq_off (Int32.of_int freq_off);
+    w_str b freq_off 0 (freq :> string)
 end
 
-let to_buf tree ~encode_leaf =
+let to_buf tree =
   let b = Buf.create 1_000_000 in
-  Writer.write_tree b ~encode_leaf tree;
+  Writer.write_tree b tree;
   b
 
-let to_string tree ~encode_leaf =
-  let b = to_buf tree ~encode_leaf in
-  Buf.to_string b
-
-let output tree ~encode_leaf out_chan =
-  let b = to_buf tree ~encode_leaf in
-  Buf.output out_chan b
+let to_string tree = Buf.to_string (to_buf tree)
+let output tree out_chan = Buf.output out_chan (to_buf tree)
 
 let hist (type a) to_s key ppf lst =
   let module M = Map.Make (struct
@@ -379,7 +424,7 @@ let hist (type a) to_s key ppf lst =
 let hist_int key ppf lst = hist string_of_int key ppf lst
 let hist_str key ppf lst = hist Fun.id key ppf lst
 
-let stats ppf ((tree, _root_id), leaves) =
+let stats ppf ((tree, _root_id), freq) =
   let open Optimized in
   let str_of_node_kind = function
     | Prefix _ -> "Prefix"
@@ -444,17 +489,19 @@ let stats ppf ((tree, _root_id), leaves) =
     (List.length numbers)
     (hist_str str_of_node_kind')
     numbers (hist_str tr_is_final) numbers;
-  Format.fprintf ppf "@[<v 2>Leaves: %d@]@\n" (Array.length leaves);
+  let freq = Freq.to_int_list freq in
+  Format.fprintf ppf "@[<v 2>Freq: %d@ With value:@ %a@]@\n" (List.length freq)
+    (hist_int Fun.id) freq;
   ()
 
-let rec pp nodes ppf id =
+let rec pp freq nodes index ppf id =
   let open Optimized in
   let fpf fmt = Format.fprintf ppf fmt in
   match IdMap.find id nodes with
   | Branches brs ->
       let rec loop _ brs =
         List.iter
-          (fun (c, tr) -> fpf "%c %a@ " c (pp nodes) tr.next)
+          (fun (c, tr) -> fpf "%c %a@ " c (pp_tr freq nodes index) tr)
           brs.b_branches;
         match brs.b_next with Some b -> fpf "next@ %a" loop b | None -> ()
       in
@@ -462,17 +509,19 @@ let rec pp nodes ppf id =
   | Btree (labels, brs) ->
       fpf "@[<v 2>Btree@ ";
       for i = 0 to Array.length brs - 1 do
-        fpf "%c %a@ " labels.[i] (pp nodes) brs.(i).next
+        fpf "%c %a@ " labels.[i] (pp_tr freq nodes index) brs.(i)
       done;
       fpf "@]"
   | Prefix (prefix, next) ->
-      fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp nodes) next.next
-  | Number (_, next) -> fpf "@[<v 2>Number@ %a@]" (pp nodes) next.next
+      fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp_tr freq nodes index) next
+  | Number (_, next) -> fpf "@[<v 2>Number@ %a@]" (pp_tr freq nodes index) next
 
-let pp pp_leaf ppf ((nodes, root_id), leaves) =
-  pp nodes ppf root_id;
-  Format.fprintf ppf "@\n@[<v>%a@]@\n"
-    Format.(pp_print_array ~pp_sep:pp_print_space pp_leaf)
-    leaves
+and pp_tr freq nodes index ppf tr =
+  let index = index + tr.number + if tr.final then 1 else 0 in
+  Format.fprintf ppf "freq=%d@ " (Freq.get freq index);
+  pp freq nodes index ppf tr.next
+
+let pp ppf ((nodes, root_id), freq) = pp freq nodes 0 ppf root_id
 
 module Complete_tree = Complete_tree
+module K_medians = K_medians
