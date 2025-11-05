@@ -7,11 +7,32 @@
   84K dict
 
   $ cdict-tool query dict type module function value match
-  found: "type" freq=15
-  found: "module" freq=15
-  found: "function" freq=15
-  found: "value" freq=15
-  found: "match" freq=15
+  found: "type" freq=15 index=7526
+  prefix: "typexpr" freq=15 index=7540
+  prefix: "types" freq=15 index=7537
+  prefix: "typeconstr" freq=14 index=7530
+  prefix: "typename" freq=0 index=7535
+  prefix: "typecheck" freq=7 index=7527
+  found: "module" freq=15 index=5399
+  prefix: "moduleref" freq=5 index=5403
+  prefix: "moduleexamples" freq=10 index=5401
+  prefix: "modulename" freq=5 index=5402
+  prefix: "modulealias" freq=5 index=5400
+  prefix: "module" freq=15 index=5399
+  found: "function" freq=15 index=4302
+  prefix: "functions" freq=15 index=4306
+  prefix: "functional" freq=14 index=4303
+  prefix: "function" freq=15 index=4302
+  prefix: "functionals" freq=7 index=4305
+  prefix: "functionality" freq=5 index=4304
+  found: "value" freq=15 index=7722
+  prefix: "valuerestrictio" freq=0 index=7723
+  prefix: "value" freq=15 index=7722
+  found: "match" freq=15 index=5267
+  prefix: "matching" freq=15 index=5270
+  prefix: "matches" freq=14 index=5269
+  prefix: "match" freq=15 index=5267
+  prefix: "matched" freq=14 index=5268
 
   $ cdict-tool query dict overload enum defensive coding
   not found: "overload"
@@ -19,6 +40,18 @@
   not found: "defensive"
   not found: "coding"
   [4]
+
+Prefix search:
+
+  $ cdict-tool query dict typ
+  found: "typ" freq=15 index=7524
+  prefix: "typ" freq=15 index=7524
+  prefix: "typing" freq=13 index=7544
+  prefix: "typexr" freq=5 index=7541
+  prefix: "typically" freq=14 index=7543
+  prefix: "typexpr" freq=15 index=7540
+
+Stats:
 
   $ cdict-tool stats words.combined
   Parsing "words.combined"

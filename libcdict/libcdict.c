@@ -104,6 +104,8 @@ static void cdict_find_node(void const *data, ptr_t ptr,
   {
     result->found = (bool)PTR_IS_FINAL(ptr);
     result->index = index;
+    // Remove the number field and final flag from prefix_ptr.
+    result->prefix_ptr = ptr & ~(PTR_NUMBER_MASK | PTR_FLAG_FINAL);
     return;
   }
   if (PTR_IS_FINAL(ptr))
@@ -249,4 +251,126 @@ int cdict_word(cdict_t const *dict, int index, char *dst, int max_length)
 {
   return cdict_word_node(dict->data, dict->root_ptr, index, dst, 0,
       max_length);
+}
+
+/** ************************************************************************
+    Priority queue storing the N most frequent words.
+    ************************************************************************ */
+
+typedef struct
+{
+  int freq:4;
+  int index:28;
+} word_freq_t;
+
+typedef struct
+{
+  word_freq_t *q;
+  int ends; // Cannot be bigger than [max_length].
+  int max_length;
+} priority_t;
+
+static void priority_init(priority_t *p, word_freq_t *q, int q_len)
+{
+  *p = (priority_t){ .q = q, .ends = 0, .max_length = q_len };
+}
+
+/** Add a word to the priority queue, if possible. Do nothing if the queue is
+    full and the new word ranks lower than any other word already stored.
+    Stable: If two words with equal priority are added, the one added first
+    ranks higher. */
+static void priority_add(priority_t *p, int freq, int index)
+{
+  int i = p->ends;
+  if (p->ends == p->max_length)
+  {
+    i--;
+    if (p->q[i].freq >= freq)
+      return; // New word ranks lower than the lowest already in the queue
+  }
+  else
+    p->ends++;
+  while (i > 0)
+  {
+    int parent = (i - 1) / 2;
+    if (p->q[parent].freq >= freq)
+      break;
+    p->q[i] = p->q[parent];
+    i = parent;
+  }
+  p->q[i] = (word_freq_t){ .freq = freq, .index = index };
+}
+
+/** ************************************************************************
+    cdict_list_prefix
+    ************************************************************************ */
+
+static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst);
+
+static void prefix_branches(cdict_t const *dict, uint32_t off, int index,
+    priority_t *dst)
+{
+  branches_t const *b = dict->data + off;
+  while (true)
+  {
+    for (int j = 0; j < b->length; j++)
+    {
+      if (b->branches[j] != 0)
+        prefix(dict, b->branches[j], index, dst);
+    }
+    if (b->has_next == 0)
+      break;
+    b = BRANCHES_NEXT(b);
+  }
+}
+
+// TODO: Iterate btree nodes in sorted order
+static void prefix_btree(cdict_t const *dict, uint32_t off, int index,
+    priority_t *dst)
+{
+  btree_t const *b = dict->data + off;
+  for (int j = 0; j < BTREE_NODE_LENGTH && b->labels[j] != 0; j++)
+    prefix(dict, b->next[j], index, dst);
+}
+
+static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
+{
+  int32_t off = PTR_OFFSET(ptr);
+  index += PTR_NUMBER(ptr);
+  if (PTR_IS_FINAL(ptr))
+  {
+    priority_add(dst, cdict_freq(dict, index), index);
+    index++;
+  }
+  switch (PTR_KIND(ptr))
+  {
+    case BRANCHES:
+      prefix_branches(dict, off, index, dst);
+      break;
+    case PREFIX:
+      prefix_t const *p = dict->data + off;
+      prefix(dict, p->next, index, dst);
+      break;
+    case BTREE:
+      prefix_btree(dict, off, index, dst);
+      break;
+    case NUMBER:
+      number_t const *n = dict->data + off;
+      prefix(dict, n->next, index, dst);
+      break;
+  }
+}
+
+int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
+    int count)
+{
+  if (r->prefix_ptr == 0)
+    return 0;
+  word_freq_t words[count];
+  priority_t queue;
+  priority_init(&queue, words, count);
+  prefix(dict, (ptr_t)r->prefix_ptr, r->index, &queue);
+  for (int i = 0; i < queue.ends; i++)
+    dst[i] = words[i].index;
+  return queue.ends;
 }

@@ -25,6 +25,7 @@ static value alloc_result(cdict_result_t const *r)
   v = caml_alloc_tuple(3);
   Store_field(v, 0, Val_bool(r->found));
   Store_field(v, 1, Val_int(r->index));
+  Store_field(v, 2, Val_int(r->prefix_ptr));
   CAMLreturn(v);
 }
 
@@ -33,6 +34,7 @@ static void result_of_value(value v, cdict_result_t *dst)
 {
   dst->found = Bool_val(Field(v, 0));
   dst->index = Int_val(Field(v, 1));
+  dst->prefix_ptr = Int_val(Field(v, 2));
 }
 
 value cdict_of_string_ocaml(value str)
@@ -72,4 +74,19 @@ value cdict_word_ocaml(value dict, value index)
   int len = cdict_word(CDICT_VAL(dict), Int_val(index), dst, max_len);
   dst[len] = '\0';
   CAMLreturn(caml_copy_string(dst));
+}
+
+value cdict_list_prefix_ocaml(value dict, value result, value length)
+{
+  CAMLparam3(dict, result, length);
+  CAMLlocal1(array);
+  int dst_len = Int_val(length);
+  int dst[dst_len];
+  cdict_result_t r;
+  result_of_value(result, &r);
+  int final_len = cdict_list_prefix(CDICT_VAL(dict), &r, dst, dst_len);
+  array = caml_alloc_tuple(final_len);
+  for (int i = 0; i < final_len; i++)
+    Store_field(array, i, Val_int(dst[i]));
+  CAMLreturn(array);
 }
