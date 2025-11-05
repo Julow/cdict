@@ -11,7 +11,7 @@
 
 typedef struct
 {
-  char const *data;
+  void const *data;
   size_t size;
   int32_t root_ptr;
   uint8_t const *freq;

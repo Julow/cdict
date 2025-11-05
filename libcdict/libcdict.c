@@ -1,6 +1,5 @@
 #include "libcdict.h"
 #include "libcdict_format.h"
-#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,6 +16,10 @@ cdict_t cdict_of_string(char const *data, int size)
   };
   return dict;
 }
+
+/** ************************************************************************
+    cdict_find
+    ************************************************************************ */
 
 static void cdict_find_node(void const *data, ptr_t ptr,
     char const *word, char const *end, int index, cdict_result_t *result);
@@ -107,7 +110,8 @@ static void cdict_find_node(void const *data, ptr_t ptr,
     index++;
   switch (PTR_KIND(ptr))
   {
-    case BRANCHES: return cdict_find_branches(data, off, word, end, index, result);
+    case BRANCHES:
+      return cdict_find_branches(data, off, word, end, index, result);
     case PREFIX: return cdict_find_prefix(data, off, word, end, index, result);
     case BTREE: return cdict_find_btree(data, off, word, end, index, result);
     case NUMBER: return cdict_find_number(data, off, word, end, index, result);
@@ -126,6 +130,10 @@ void cdict_find(cdict_t const *dict, char const *word, int word_size,
       result);
 }
 
+/** ************************************************************************
+    cdict_freq
+    ************************************************************************ */
+
 int cdict_freq(cdict_t const *dict, int index)
 {
   uint8_t f = dict->freq[index / 2];
@@ -133,33 +141,48 @@ int cdict_freq(cdict_t const *dict, int index)
   return f & 0xF;
 }
 
+/** ************************************************************************
+    cdict_word
+    ************************************************************************ */
+
 static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
     int dsti, int max_len);
+
+/** The number field of a pointer + the number field of the next node if it is
+    a NUMBER node. */
+static inline int ptr_number_next(void const *data, ptr_t ptr)
+{
+  int next_number = 0;
+  if (PTR_KIND(ptr) == NUMBER)
+    next_number = ((number_t const*)(data + PTR_OFFSET(ptr)))->number;
+  return PTR_NUMBER(ptr) + next_number;
+}
 
 static int cdict_word_branches(void const *data, uint32_t off, int index,
     char *dst, int dsti, int max_len)
 {
   branches_t const *b = data + off;
-  ptr_t next = 0;
+  if (b->length == 0)
+    return dsti;
+  while (b->has_next)
+  {
+    branches_t const *next_b = BRANCHES_NEXT(b);
+    if (ptr_number_next(data, next_b->branches[0]) > index)
+      break; // branches[0] is never equal to 0
+    b = next_b;
+  }
+  int i = 0;
   while (true)
   {
-    bool has_n = b->has_next;
-    for (int i = 0; i < b->length; i++)
-    {
-      if (b->branches[i] == 0) continue;
-      if (PTR_NUMBER(b->branches[i]) > index)
-      {
-        has_n = false;
-        break;
-      }
-      next = b->branches[i];
-      dst[dsti] = b->low + i;
-    }
-    if (!has_n) break;
-    b = BRANCHES_NEXT(b);
+    int j = i + 1;
+    while (j < b->length && b->branches[j] == 0)
+      j++;
+    if (j >= b->length || ptr_number_next(data, b->branches[j]) > index)
+      break;
+    i = j;
   }
-  assert(next != 0);
-  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
+  dst[dsti] = b->low + i;
+  return cdict_word_node(data, b->branches[i], index, dst, dsti + 1, max_len);
 }
 
 static int cdict_word_prefix(void const *data, uint32_t off, int index,
@@ -177,7 +200,7 @@ static int cdict_word_number(void const *data, uint32_t off, int index,
     char *dst, int dsti, int max_len)
 {
   number_t const *n = data + off;
-  return cdict_word_node(data, n->next, index, dst, dsti, max_len);
+  return cdict_word_node(data, n->next, index - n->number, dst, dsti, max_len);
 }
 
 static int cdict_word_btree(void const *data, uint32_t off, int index,
@@ -196,7 +219,6 @@ static int cdict_word_btree(void const *data, uint32_t off, int index,
       i = i * 2 + 2;
     }
   }
-  assert(next != 0);
   return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
 }
 
