@@ -27,7 +27,11 @@ let pp_list fmt = Format.(pp_print_list ~pp_sep:pp_print_space) fmt
 
 let find d word =
   let r = Cdict.find d word in
-  if r.found then Some (Cdict.freq d r.index) else None
+  if r.found then (
+    expect ~msg:"Retrieve word" Format.pp_print_string (Cdict.word d r.index)
+      word;
+    Some (Cdict.freq d r.index))
+  else None
 
 let assert_found d word expected_leaf =
   expect ~msg:"Find returned unexpected value. " pp_leaf_opt (find d word)

@@ -132,3 +132,99 @@ int cdict_freq(cdict_t const *dict, int index)
   if (index & 1) f = f >> 4;
   return f & 0xF;
 }
+
+static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
+    int dsti, int max_len);
+
+static int cdict_word_branches(void const *data, uint32_t off, int index,
+    char *dst, int dsti, int max_len)
+{
+  branches_t const *b = data + off;
+  ptr_t next = 0;
+  while (true)
+  {
+    bool has_n = b->has_next;
+    for (int i = 0; i < b->length; i++)
+    {
+      if (b->branches[i] == 0) continue;
+      if (PTR_NUMBER(b->branches[i]) > index)
+      {
+        has_n = false;
+        break;
+      }
+      next = b->branches[i];
+      dst[dsti] = b->low + i;
+    }
+    if (!has_n) break;
+    b = BRANCHES_NEXT(b);
+  }
+  assert(next != 0);
+  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
+}
+
+static int cdict_word_prefix(void const *data, uint32_t off, int index,
+    char *dst, int dsti, int max_len)
+{
+  prefix_t const *b = data + off;
+  dst[dsti++] = b->prefix[0];
+  for (int i = 1; i < PREFIX_NODE_LENGTH && b->prefix[i] != 0
+      && dsti < max_len; i++)
+    dst[dsti++] = b->prefix[i];
+  return cdict_word_node(data, b->next, index, dst, dsti, max_len);
+}
+
+static int cdict_word_number(void const *data, uint32_t off, int index,
+    char *dst, int dsti, int max_len)
+{
+  number_t const *n = data + off;
+  return cdict_word_node(data, n->next, index, dst, dsti, max_len);
+}
+
+static int cdict_word_btree(void const *data, uint32_t off, int index,
+    char *dst, int dsti, int max_len)
+{
+  btree_t const *b = data + off;
+  ptr_t next = 0;
+  for (int i = 0; i < BTREE_NODE_LENGTH && b->labels[i] != 0; )
+  {
+    if (PTR_NUMBER(b->next[i]) > index)
+      i = i * 2 + 1;
+    else
+    {
+      next = b->next[i];
+      dst[dsti] = b->labels[i];
+      i = i * 2 + 2;
+    }
+  }
+  assert(next != 0);
+  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
+}
+
+static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
+    int dsti, int max_len)
+{
+  if (dsti >= max_len)
+    return dsti;
+  uint32_t off = PTR_OFFSET(ptr);
+  index -= PTR_NUMBER(ptr);
+  if (PTR_IS_FINAL(ptr))
+  {
+    if (index == 0)
+      return dsti;
+    index--;
+  }
+  switch (PTR_KIND(ptr))
+  {
+    case BRANCHES: return cdict_word_branches(data, off, index, dst, dsti, max_len);
+    case PREFIX: return cdict_word_prefix(data, off, index, dst, dsti, max_len);
+    case BTREE: return cdict_word_btree(data, off, index, dst, dsti, max_len);
+    case NUMBER: return cdict_word_number(data, off, index, dst, dsti, max_len);
+  }
+  return dsti;
+}
+
+int cdict_word(cdict_t const *dict, int index, char *dst, int max_length)
+{
+  return cdict_word_node(dict->data, dict->root_ptr, index, dst, 0,
+      max_length);
+}

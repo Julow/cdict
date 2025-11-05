@@ -63,3 +63,13 @@ value cdict_freq_ocaml(value dict, value index)
   CAMLparam2(dict, index);
   CAMLreturn(Val_int(cdict_freq(CDICT_VAL(dict), Int_val(index))));
 }
+
+value cdict_word_ocaml(value dict, value index)
+{
+  CAMLparam2(dict, index);
+  int const max_len = 15;
+  char dst[max_len + 1];
+  int len = cdict_word(CDICT_VAL(dict), Int_val(index), dst, max_len);
+  dst[len] = '\0';
+  CAMLreturn(caml_copy_string(dst));
+}

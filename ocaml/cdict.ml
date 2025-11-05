@@ -19,3 +19,6 @@ external find : t -> string -> result = "cdict_find_ocaml"
 
 external freq : t -> index -> int = "cdict_freq_ocaml"
 (** Query the frequency associated to a word. *)
+
+external word : t -> index -> string = "cdict_word_ocaml"
+(** Retrieve the word at the given index. *)

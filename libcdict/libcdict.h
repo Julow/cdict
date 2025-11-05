@@ -38,3 +38,7 @@ void cdict_find(cdict_t const *dict, char const *word, int word_size,
 /** Frequency associated to a word. [index] is the corresponding field in
     [cdict_result_t]. */
 int cdict_freq(cdict_t const *dict, int index);
+
+/** Retrieve the word at the given index. Returns the number of chars written
+    to [dst]. Do not write a NUL byte at the end of [dst]. */
+int cdict_word(cdict_t const *dict, int index, char *dst, int max_length);
