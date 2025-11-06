@@ -76,7 +76,7 @@ value cdict_word_ocaml(value dict, value index)
   CAMLreturn(caml_copy_string(dst));
 }
 
-value cdict_list_prefix_ocaml(value dict, value result, value length)
+value cdict_suffixes_ocaml(value dict, value result, value length)
 {
   CAMLparam3(dict, result, length);
   CAMLlocal1(array);
@@ -84,7 +84,7 @@ value cdict_list_prefix_ocaml(value dict, value result, value length)
   int dst[dst_len];
   cdict_result_t r;
   result_of_value(result, &r);
-  int final_len = cdict_list_prefix(CDICT_VAL(dict), &r, dst, dst_len);
+  int final_len = cdict_suffixes(CDICT_VAL(dict), &r, dst, dst_len);
   array = caml_alloc_tuple(final_len);
   for (int i = 0; i < final_len; i++)
     Store_field(array, i, Val_int(dst[i]));

@@ -302,12 +302,12 @@ static void priority_add(priority_t *p, int freq, int index)
 }
 
 /** ************************************************************************
-    cdict_list_prefix
+    cdict_suffixes
     ************************************************************************ */
 
-static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst);
+static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst);
 
-static void prefix_branches(cdict_t const *dict, uint32_t off, int index,
+static void suffixes_branches(cdict_t const *dict, uint32_t off, int index,
     priority_t *dst)
 {
   branches_t const *b = dict->data + off;
@@ -316,7 +316,7 @@ static void prefix_branches(cdict_t const *dict, uint32_t off, int index,
     for (int j = 0; j < b->length; j++)
     {
       if (b->branches[j] != 0)
-        prefix(dict, b->branches[j], index, dst);
+        suffixes(dict, b->branches[j], index, dst);
     }
     if (b->has_next == 0)
       break;
@@ -325,15 +325,15 @@ static void prefix_branches(cdict_t const *dict, uint32_t off, int index,
 }
 
 // TODO: Iterate btree nodes in sorted order
-static void prefix_btree(cdict_t const *dict, uint32_t off, int index,
+static void suffixes_btree(cdict_t const *dict, uint32_t off, int index,
     priority_t *dst)
 {
   btree_t const *b = dict->data + off;
   for (int j = 0; j < BTREE_NODE_LENGTH && b->labels[j] != 0; j++)
-    prefix(dict, b->next[j], index, dst);
+    suffixes(dict, b->next[j], index, dst);
 }
 
-static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
+static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
 {
   int32_t off = PTR_OFFSET(ptr);
   index += PTR_NUMBER(ptr);
@@ -345,23 +345,23 @@ static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
   switch (PTR_KIND(ptr))
   {
     case BRANCHES:
-      prefix_branches(dict, off, index, dst);
+      suffixes_branches(dict, off, index, dst);
       break;
     case PREFIX:
       prefix_t const *p = dict->data + off;
-      prefix(dict, p->next, index, dst);
+      suffixes(dict, p->next, index, dst);
       break;
     case BTREE:
-      prefix_btree(dict, off, index, dst);
+      suffixes_btree(dict, off, index, dst);
       break;
     case NUMBER:
       number_t const *n = dict->data + off;
-      prefix(dict, n->next, index + n->number, dst);
+      suffixes(dict, n->next, index + n->number, dst);
       break;
   }
 }
 
-int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
+int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
     int count)
 {
   if (r->prefix_ptr == 0)
@@ -369,7 +369,7 @@ int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
   word_freq_t words[count];
   priority_t queue;
   priority_init(&queue, words, count);
-  prefix(dict, r->prefix_ptr, r->index, &queue);
+  suffixes(dict, r->prefix_ptr, r->index, &queue);
   for (int i = 0; i < queue.ends; i++)
     dst[i] = words[i].index;
   return queue.ends;
@@ -457,7 +457,7 @@ static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
       priority_add(q, cdict_freq(dict, r.index), r.index);
     // Also add suffixes of any length.
     if (r.prefix_ptr != 0)
-      prefix(dict, r.prefix_ptr, r.index, q);
+      suffixes(dict, r.prefix_ptr, r.index, q);
     return;
   }
   if (word == end)

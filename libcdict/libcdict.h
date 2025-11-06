@@ -29,7 +29,7 @@ typedef struct
   /** Unique index of the recognized word or [-1] if the query is not
       recognized. Find the corresponding freq at [dict->freq[index]]. */
   uint32_t prefix_ptr;
-  /** Internal node where the search stopped. Use [cdict_list_prefix] to list
+  /** Internal node where the search stopped. Use [cdict_suffixes] to list
       the words starting with this prefix. Might be [0], in which case the
       queried is not the prefix of any word in the dictionary. */
 } cdict_result_t;
@@ -47,15 +47,15 @@ int cdict_freq(cdict_t const *dict, int index);
     to [dst]. Do not write a NUL byte at the end of [dst]. */
 int cdict_word(cdict_t const *dict, int index, char *dst, int max_length);
 
-/** List the words starting with the prefix first queried with [cdict_find].
+/** List the words starting with the word first queried with [cdict_find].
     This can be used even if [result->found] is false. Write up to [count] word
     indexes to [dst]. Return the number of word indexes written to [dst]. */
-int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
+int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
     int count);
 
 /** Lists words that are a [dist] editions away from the [word] according to
     Levenshtein distance. Do not return words that have a distance less than
-    [dist]. The [count] most frequent words are returned. [list_prefix] is
+    [dist]. The [count] most frequent words are returned. [suffixes] is
     called on every words that are found. The returned array cannot contain
     more than [count] elements but might be smaller. */
 int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,

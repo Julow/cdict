@@ -19,7 +19,7 @@ let query ~quiet dict q =
       let freq = Cdict.freq dict r.index in
       Printf.printf "found: %S freq=%d index=%d\n" q freq (r.index :> int)
     else Printf.printf "not found: %S\n" q;
-    let prefixes_idx = Cdict.list_prefix dict r 5 in
+    let prefixes_idx = Cdict.suffixes dict r 5 in
     Array.iter
       (fun idx ->
         Printf.printf "prefix: %S freq=%d index=%d\n" (Cdict.word dict idx)
