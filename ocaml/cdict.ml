@@ -30,3 +30,12 @@ external list_prefix : t -> result -> int -> index array
 (** List words that starts with the query passed to {!find}. This can be called
     even if [result.found] is false. The returned array cannot contain more than
     [len] elements but might be smaller. *)
+
+external distance : t -> string -> dist:int -> count:int -> index array
+  = "cdict_distance_ocaml"
+(** [distance dict word ~dist ~count] lists words that are a [dist] editions
+    away from the [word] according to Levenshtein distance. Do not return words
+    that have a distance less than [dist]. The [count] most frequent words are
+    returned. [list_prefix] is called on every words that are found. The
+    returned array cannot contain more than [count] elements but might be
+    smaller. *)

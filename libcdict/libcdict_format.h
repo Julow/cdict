@@ -117,7 +117,7 @@ the end of tree was reached.
 typedef struct
 {
   char labels[BTREE_NODE_LENGTH];
-  ptr_t next[];
+  ptr_t next[]; // Size might be lower than BTREE_NODE_LENGTH, check [labels].
 } btree_t;
 
 /** NUMBER nodes (size = 8 bytes)

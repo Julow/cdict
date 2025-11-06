@@ -52,3 +52,11 @@ int cdict_word(cdict_t const *dict, int index, char *dst, int max_length);
     indexes to [dst]. Return the number of word indexes written to [dst]. */
 int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
     int count);
+
+/** Lists words that are a [dist] editions away from the [word] according to
+    Levenshtein distance. Do not return words that have a distance less than
+    [dist]. The [count] most frequent words are returned. [list_prefix] is
+    called on every words that are found. The returned array cannot contain
+    more than [count] elements but might be smaller. */
+int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
+    int *dst, int count);

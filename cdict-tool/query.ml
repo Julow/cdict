@@ -6,6 +6,12 @@ let queries_from_file = function
   | Some fname -> In_channel.(with_open_text fname input_lines)
   | None -> []
 
+let query_distance dict ~dist q =
+  Cdict.distance dict q ~dist ~count:5
+  |> Array.iter (fun idx ->
+         Printf.printf "close match: %S distance=%d freq=%d\n"
+           (Cdict.word dict idx) dist (Cdict.freq dict idx))
+
 let query ~quiet dict q =
   let r : Cdict.result = Cdict.find dict q in
   if not quiet then (
@@ -19,7 +25,9 @@ let query ~quiet dict q =
         Printf.printf "prefix: %S freq=%d index=%d\n" (Cdict.word dict idx)
           (Cdict.freq dict idx)
           (idx :> int))
-      prefixes_idx);
+      prefixes_idx;
+    query_distance dict ~dist:1 q;
+    query_distance dict ~dist:2 q);
   if r.found then 0 else 1
 
 let main quiet from_file dict_fname queries =

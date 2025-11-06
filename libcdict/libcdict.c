@@ -121,13 +121,13 @@ static void cdict_find_node(void const *data, ptr_t ptr,
   }
 }
 
+#define RESULT_T_INIT ((cdict_result_t){ \
+    .found = false, .index = 0, .prefix_ptr = 0, })
+
 void cdict_find(cdict_t const *dict, char const *word, int word_size,
     cdict_result_t *result)
 {
-  *result = (cdict_result_t){
-    .found = false,
-    .index = -1,
-  };
+  *result = RESULT_T_INIT;
   cdict_find_node(dict->data, dict->root_ptr, word, word + word_size, 0,
       result);
 }
@@ -356,7 +356,7 @@ static void prefix(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
       break;
     case NUMBER:
       number_t const *n = dict->data + off;
-      prefix(dict, n->next, index, dst);
+      prefix(dict, n->next, index + n->number, dst);
       break;
   }
 }
@@ -369,7 +369,127 @@ int cdict_list_prefix(cdict_t const *dict, cdict_result_t const *r, int *dst,
   word_freq_t words[count];
   priority_t queue;
   priority_init(&queue, words, count);
-  prefix(dict, (ptr_t)r->prefix_ptr, r->index, &queue);
+  prefix(dict, r->prefix_ptr, r->index, &queue);
+  for (int i = 0; i < queue.ends; i++)
+    dst[i] = words[i].index;
+  return queue.ends;
+}
+
+/** ************************************************************************
+    cdict_distance
+    ************************************************************************ */
+
+static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
+    char const *end, int index, int dist, priority_t *q);
+
+static void distance_branches(cdict_t const *dict, uint32_t off, char const *word,
+    char const *end, int index, int dist, priority_t *q)
+{
+  branches_t const *b = dict->data + off;
+  while (true)
+  {
+    char c = *word - b->low;
+    for (int i = 0; i < b->length; i++)
+    {
+      ptr_or_null_t tr = b->branches[i];
+      if (tr == 0) continue;
+      // Change a letter
+      distance(dict, tr, word + 1, end, index, ((c == i) ? dist : dist - 1), q);
+      // Add a letter
+      distance(dict, tr, word, end, index, dist - 1, q);
+    }
+    if (!b->has_next)
+      return;
+    b = BRANCHES_NEXT(b);
+  }
+}
+
+static void distance_btree(cdict_t const *dict, uint32_t off, char const *word,
+    char const *end, int index, int dist, priority_t *q)
+{
+  btree_t const *b = dict->data + off;
+  char c = *word;
+  for (int i = 0; i < BTREE_NODE_LENGTH && b->labels[i] != 0; i++)
+  {
+    // Change a letter
+    distance(dict, b->next[i], word + 1, end, index,
+        (c == b->labels[i]) ? dist : dist - 1, q);
+    // Add a letter
+    distance(dict, b->next[i], word, end, index, dist - 1, q);
+  }
+}
+
+static void distance_prefix_(cdict_t const *dict, prefix_t const *p, int i,
+    char const *word, char const *end, int index, int dist, priority_t *q)
+{
+  if (i == PREFIX_NODE_LENGTH || (p->prefix[i] == 0 && i > 0))
+    return distance(dict, p->next, word, end, index, dist, q);
+  if (word == end)
+    return;
+  if (dist > 0)
+  {
+    // Remove a letter
+    distance_prefix_(dict, p, i, word + 1, end, index, dist - 1, q);
+    // Add a letter
+    distance_prefix_(dict, p, i + 1, word, end, index, dist - 1, q);
+    // Change a letter
+    if (*word != p->prefix[i])
+      distance_prefix_(dict, p, i + 1, word + 1, end, index, dist - 1, q);
+  }
+  if (*word == p->prefix[i])
+    return distance_prefix_(dict, p, i + 1, word + 1, end, index, dist, q);
+}
+
+static void distance_prefix(cdict_t const *dict, uint32_t off, char const *word,
+    char const *end, int index, int dist, priority_t *q)
+{
+  distance_prefix_(dict, dict->data + off, 0, word, end, index, dist, q);
+}
+
+static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
+    char const *end, int index, int dist, priority_t *q)
+{
+  if (dist == 0)
+  {
+    cdict_result_t r = RESULT_T_INIT;
+    cdict_find_node(dict->data, ptr, word, end, index, &r);
+    if (r.found)
+      priority_add(q, cdict_freq(dict, r.index), r.index);
+    // Also add suffixes of any length.
+    if (r.prefix_ptr != 0)
+      prefix(dict, r.prefix_ptr, r.index, q);
+    return;
+  }
+  if (word == end)
+    return;
+  int32_t off = PTR_OFFSET(ptr);
+  index += PTR_NUMBER(ptr);
+  if (PTR_IS_FINAL(ptr))
+    index++;
+  // Remove a letter
+  distance(dict, ptr, word + 1, end, index, dist - 1, q);
+  switch (PTR_KIND(ptr))
+  {
+    case BRANCHES:
+      return distance_branches(dict, off, word, end, index, dist, q);
+    case PREFIX:
+      return distance_prefix(dict, off, word, end, index, dist, q);
+    case BTREE:
+      return distance_btree(dict, off, word, end, index, dist, q);
+    case NUMBER:
+      number_t const *number = dict->data + off;
+      return distance(dict, number->next, word, end, index + number->number,
+          dist, q);
+  }
+}
+
+int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
+    int *dst, int count)
+{
+  word_freq_t words[count];
+  priority_t queue;
+  priority_init(&queue, words, count);
+  distance(dict, dict->root_ptr, word, word + wlen, 0, dist, &queue);
   for (int i = 0; i < queue.ends; i++)
     dst[i] = words[i].index;
   return queue.ends;

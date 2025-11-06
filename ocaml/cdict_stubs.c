@@ -90,3 +90,18 @@ value cdict_list_prefix_ocaml(value dict, value result, value length)
     Store_field(array, i, Val_int(dst[i]));
   CAMLreturn(array);
 }
+
+value cdict_distance_ocaml(value dict, value word, value dist, value count)
+{
+  CAMLparam4(dict, word, dist, count);
+  CAMLlocal1(array);
+  int dst_len = Int_val(count);
+  int dst[dst_len];
+  int final_len =
+    cdict_distance(CDICT_VAL(dict), String_val(word), caml_string_length(word),
+        Int_val(dist), dst, dst_len);
+  array = caml_alloc_tuple(final_len);
+  for (int i = 0; i < final_len; i++)
+    Store_field(array, i, Val_int(dst[i]));
+  CAMLreturn(array);
+}
