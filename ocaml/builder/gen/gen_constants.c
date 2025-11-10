@@ -26,9 +26,8 @@ int main()
 {
   module("C");
 
-  VAL(c_, PREFIX_NODE_LENGTH);
   VAL(c_, BTREE_NODE_LENGTH);
-  VAL(c_, PTR_NUMBER_MAX);
+  VAL(c_, MAX_PTR_NUMBER);
   VAL(c_, PTR_NUMBER_OFFSET);
   VAL_INT32(mask_, PTR_KIND_MASK);
   VAL_INT32(mask_, PTR_FLAGS_MASK);
@@ -48,8 +47,8 @@ int main()
   FIELD(branches_t, has_next);
   FIELD(branches_t, branches);
 
+  FIELD(prefix_t, next_ptr_and_len);
   FIELD(prefix_t, prefix);
-  FIELD(prefix_t, next);
 
   FIELD(btree_t, labels);
   FIELD(btree_t, next);

@@ -33,7 +33,7 @@ module Optimized = struct
   type node =
     | Branches of branches
     | Btree of string * tr array  (** Labels encodes a binary tree. *)
-    | Prefix of string * tr  (** Up to [C.c_PREFIX_NODE_LENGTH] bytes prefix *)
+    | Prefix of string * tr
     | Number of int * tr
 
   type t = node IdMap.t * Id.t
@@ -100,15 +100,17 @@ module Optimized = struct
   module Seen = Dfa.Id.Map
   open Dfa
 
-  let rec fold_prefix dfa prefix next number final =
-    if String.length prefix >= C.c_PREFIX_NODE_LENGTH || number > 0 || final
-    then (prefix, next, number, final)
+  let rec fold_prefix dfa prefix next final =
+    (* The maximum prefix length is [C.c_MAX_PTR_NUMBER] because it is encoded
+       in the number field. *)
+    if final || String.length prefix >= C.c_MAX_PTR_NUMBER then
+      (prefix, next, final)
     else
       match state dfa next with
-      | [ { c = '\x00'; _ } ] | [] | _ :: _ :: _ -> (prefix, next, number, final)
-      | [ { c; next; number = n; final } ] ->
+      | [ { c; next; number = 0; final } ] ->
           let prefix = prefix ^ String.make 1 c in
-          fold_prefix dfa prefix next (number + n) final
+          fold_prefix dfa prefix next final
+      | _ -> (prefix, next, final)
 
   let rec node_of_dfa seen ids dfa sti =
     match Seen.find_opt sti !seen with
@@ -119,7 +121,7 @@ module Optimized = struct
         (ids, id)
 
   and node_of_tr seen ids dfa ~number ~final next =
-    if number > C.c_PTR_NUMBER_MAX then
+    if number > C.c_MAX_PTR_NUMBER then
       let ids, next = node_of_tr seen ids dfa ~number:0 ~final next in
       let ids, next = add ids (Number (number, next)) in
       (ids, { next; number = 0; final = false })
@@ -128,11 +130,11 @@ module Optimized = struct
       (ids, { next; number; final })
 
   and node_of_dfa_uncached seen ids dfa = function
-    | [ { c; next; number; final } ] ->
-        let prefix, next, number, final =
-          fold_prefix dfa (String.make 1 c) next number final
+    | [ { c; next; number = 0; final } ] ->
+        let prefix, next, final =
+          fold_prefix dfa (String.make 1 c) next final
         in
-        let ids, tr = node_of_tr seen ids dfa ~number ~final next in
+        let ids, tr = node_of_tr seen ids dfa ~number:0 ~final next in
         add ids (Prefix (prefix, tr))
     | trs ->
         let ids, branches =
@@ -244,7 +246,7 @@ end
 type kind = [ `Prefix | `Branches | `Btree | `Number ]
 
 module Ptr : sig
-  type t
+  type t = private int32
 
   val v : final:bool -> number:int -> kind -> int -> t
   val w : Buf.t -> int -> int -> t -> unit
@@ -260,7 +262,7 @@ end = struct
   let v ~final ~number kind offset =
     let open Int32 in
     let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
-    assert (number land lnot C.c_PTR_NUMBER_MAX = 0);
+    assert (number land lnot C.c_MAX_PTR_NUMBER = 0);
     let number = shift_left (of_int number) C.c_PTR_NUMBER_OFFSET in
     let offset = of_int offset in
     assert (logand number (lognot C.mask_PTR_NUMBER_MASK) = 0l);
@@ -333,14 +335,15 @@ module Writer = struct
     off
 
   and write_prefix_node seen ?align b nodes p next =
-    let off = alloc ?align b S.prefix_t in
-    let next_ptr = write_node seen b nodes next in
-    assert (String.length p <= C.c_PREFIX_NODE_LENGTH);
-    w_bzero b off O.prefix_t_prefix C.c_PREFIX_NODE_LENGTH;
-    for i = 0 to String.length p - 1 do
-      w_int8 b off (O.prefix_t_prefix + i) (Char.code p.[i])
-    done;
-    Ptr.w b off O.prefix_t_next next_ptr;
+    let len = String.length p in
+    let off = alloc ?align b (S.prefix_t + len) in
+    let next_ptr :> int32 = write_node seen b nodes next in
+    assert (Int32.logand next_ptr C.mask_PTR_NUMBER_MASK = 0l);
+    let next_ptr =
+      Int32.(logor next_ptr (shift_left (of_int len) C.c_PTR_NUMBER_OFFSET))
+    in
+    w_int32 b off O.prefix_t_next_ptr_and_len next_ptr;
+    w_str b off O.prefix_t_prefix p;
     off
 
   and write_branches_node seen ?align b nodes brs =

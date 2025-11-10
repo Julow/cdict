@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  84K dict
+  88K dict
 
   $ cdict-tool query dict type module function value match
   found: "type" freq=15 index=7526
@@ -46,10 +46,9 @@
   prefix: "functionals" freq=7 index=4305
   prefix: "functionality" freq=5 index=4304
   close match: "Functional" distance=1 freq=7
-  close match: "fonctionnel" distance=1 freq=0
+  close match: "Function" distance=1 freq=10
   close match: "Functionals" distance=1 freq=0
   close match: "Function" distance=1 freq=10
-  close match: "fonctionnels" distance=1 freq=0
   close match: "functionals" distance=2 freq=7
   close match: "functionality" distance=2 freq=5
   close match: "Functionals" distance=2 freq=0
@@ -139,7 +138,7 @@ Stats:
   $ cdict-tool stats words.combined
   Parsing "words.combined"
   Generating a 7984 words dictionary.
-  Nodes: 5093
+  Nodes: 4918
   Branch nodes: 742
     With 'next' nodes:
     |  1: 649  |  2: 46   |  3: 26   |  4: 9    |  5: 5    |  6: 4   
@@ -152,14 +151,16 @@ Stats:
     Transitions: 3105
       | Final: 885  | Non-final: 2220 |
       With numbers length in bytes: |  1: 3105 |
-  Prefix nodes: 2698
+  Prefix nodes: 2523
     Followed by:
-    | Branches: 1192 | Btree: 474  | Prefix: 1032 |
+    | Branches: 1641 | Btree: 475  | Prefix: 407  |
     With size:
-    |  1: 578  |  2: 547  |  3: 530  |  4: 1043 |
-    Transitions: 2698
-      | Final: 1585 | Non-final: 1113 |
-      With numbers length in bytes: |  1: 2698 |
+    |  1: 550  |  2: 523  |  3: 505  |  4: 358  |  5: 246  |  6: 145 
+    |  7: 88   |  8: 54   |  9: 17   | 10: 22   | 11: 5    | 12: 1   
+    | 13: 4    | 15: 1    | 17: 1    | 19: 1    | 27: 1    | 61: 1    |
+    Transitions: 2523
+      | Final: 2061 | Non-final: 462  |
+      With numbers length in bytes: |  1: 2523 |
   Btree nodes: 1520
     With size:
     |  2: 802  |  3: 355  |  4: 189  |  5: 65   |  6: 44   |  7: 42  

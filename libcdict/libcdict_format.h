@@ -32,12 +32,12 @@ typedef enum
   NUMBER = 0b011,
 } kind_t;
 
-#define PTR_NUMBER_MAX 0xFFu
+#define MAX_PTR_NUMBER 0xFFu
 #define PTR_NUMBER_OFFSET 24
 
 #define PTR_KIND_MASK 0b011u
 #define PTR_FLAGS_MASK 0b100u
-#define PTR_NUMBER_MASK (PTR_NUMBER_MAX << PTR_NUMBER_OFFSET)
+#define PTR_NUMBER_MASK (MAX_PTR_NUMBER << PTR_NUMBER_OFFSET)
 #define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
 
 /** Whether the pointer is a final transition. */
@@ -82,25 +82,22 @@ typedef struct
 
 /** PREFIX nodes (size = 8 bytes)
 
-A single branch, consuming up to 3 bytes from the query.
-The 'prefix' field is interpreted as follow:
-The first byte is always part of the prefix. The next bytes are only part of
-the prefix if they are not NUL, (where XX can be anything, including 0):
-XX 00 00 00  A 1 byte prefix
-XX ++ 00 00  A 2 byte prefix
-XX ++ ++ 00  A 3 byte prefix
-XX ++ ++ ++  A 4 byte prefix
-This means that a word containing a long string of NUL byte is very
-inefficiently encoded.
-*/
+A single branch, consuming a prefix of the query.
+The 'next' field contains the pointer to the next node and the length of the
+'prefix' array. The number field is used to store the length. The pointer is
+considered to have a number field equal to 0.
 
-#define PREFIX_NODE_LENGTH 4
+The length cannot be 0.
+*/
 
 typedef struct
 {
-  char prefix[PREFIX_NODE_LENGTH];
-  ptr_t next;
+  uint32_t next_ptr_and_len;
+  char prefix[];
 } prefix_t;
+
+#define PREFIX_NEXT_PTR(P) ((P)->next_ptr_and_len & ~PTR_NUMBER_MASK)
+#define PREFIX_LENGTH(P) PTR_NUMBER((P)->next_ptr_and_len)
 
 /** BTREE nodes (size = 8 bytes to 40 bytes)
 

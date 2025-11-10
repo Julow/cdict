@@ -46,19 +46,15 @@ static void cdict_find_prefix(void const *data, int32_t off,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
   prefix_t const *node = data + off;
-  int i = 1;
-  char p = node->prefix[0];
+  char const *prefix = node->prefix;
+  char const *prefix_end = prefix + PREFIX_LENGTH(node);
   while (true)
   {
-    if (*word != p) return;
-    word++;
-    if (i == PREFIX_NODE_LENGTH) break;
-    p = node->prefix[i];
-    if (p == 0) break;
-    if (word == end) return;
-    i++;
+    if (*(word++) != *(prefix++)) return; // Prefix doesn't match
+    if (prefix == prefix_end) break; // Prefix matches
+    if (word == end) return; // Query ends
   }
-  cdict_find_node(data, node->next, word, end, index, result);
+  cdict_find_node(data, PREFIX_NEXT_PTR(node), word, end, index, result);
 }
 
 static void cdict_find_btree(void const *data, int32_t off,
@@ -191,11 +187,13 @@ static int cdict_word_prefix(void const *data, uint32_t off, int index,
     char *dst, int dsti, int max_len)
 {
   prefix_t const *b = data + off;
-  dst[dsti++] = b->prefix[0];
-  for (int i = 1; i < PREFIX_NODE_LENGTH && b->prefix[i] != 0
-      && dsti < max_len; i++)
-    dst[dsti++] = b->prefix[i];
-  return cdict_word_node(data, b->next, index, dst, dsti, max_len);
+  int end = dsti + PREFIX_LENGTH(b);
+  char const *prefix = b->prefix;
+  if (end > max_len)
+    end = max_len;
+  while (dsti < end)
+    dst[dsti++] = *(prefix++);
+  return cdict_word_node(data, PREFIX_NEXT_PTR(b), index, dst, end, max_len);
 }
 
 static int cdict_word_number(void const *data, uint32_t off, int index,
@@ -349,7 +347,7 @@ static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
       break;
     case PREFIX:
       prefix_t const *p = dict->data + off;
-      suffixes(dict, p->next, index, dst);
+      suffixes(dict, PREFIX_NEXT_PTR(p), index, dst);
       break;
     case BTREE:
       suffixes_btree(dict, off, index, dst);
@@ -422,8 +420,8 @@ static void distance_btree(cdict_t const *dict, uint32_t off, char const *word,
 static void distance_prefix_(cdict_t const *dict, prefix_t const *p, int i,
     char const *word, char const *end, int index, int dist, priority_t *q)
 {
-  if (i == PREFIX_NODE_LENGTH || (p->prefix[i] == 0 && i > 0))
-    return distance(dict, p->next, word, end, index, dist, q);
+  if (i == PREFIX_LENGTH(p))
+    return distance(dict, PREFIX_NEXT_PTR(p), word, end, index, dist, q);
   if (word == end)
     return;
   if (dist > 0)
