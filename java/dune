@@ -1,0 +1,29 @@
+(rule
+ (targets
+  (dir classes)
+  (dir gen_interfaces))
+ (package cdict-java)
+ (action
+  (run javac -d classes -h gen_interfaces %{dep:juloo.cdict/Cdict.java})))
+
+(rule
+ (target libcdict_java.so)
+ (deps gen_interfaces ../libcdict/libcdict.h)
+ (action
+  (run
+   %{cc}
+   -o
+   %{target}
+   -shared
+   -I
+   ../libcdict
+   -I
+   gen_interfaces
+   %{dep:../libcdict/libcdict.o}
+   %{dep:jni/juloo_cdict_Cdict.c})))
+
+(rule
+ (target cdict_java.jar)
+ (deps classes)
+ (action
+  (run jar -cf %{target} -C classes/ .)))

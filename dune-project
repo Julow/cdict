@@ -4,6 +4,8 @@
 
 (using menhir 3.0)
 
+(using directory-targets 0.1)
+
 (generate_opam_files true)
 
 (package
@@ -21,3 +23,10 @@
  (synopsis "Construct a minimal DFA that recognizes a list of words.")
  (description
   "Implements a minimal deterministic finite-state acyclic automaton that recognizes a finite set of words and perfect hashing. It works with a 8 bits alphabet and treat words as byte strings. It is ideal for natural language dictionaries that are constructed once and compiled into a compact representation."))
+
+(package
+ (name cdict-java)
+ (synopsis "Internal package.")
+ (allow_empty)
+ (depends cdict))
+

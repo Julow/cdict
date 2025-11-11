@@ -3,6 +3,5 @@
  (name cdict_c)
  (foreign_stubs
   (language c)
-  (flags -Wall -Wextra -Werror)
   (names libcdict))
  (modes native))

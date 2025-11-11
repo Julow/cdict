@@ -1,0 +1,126 @@
+#include <jni.h>
+#include <libcdict.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "juloo_cdict_Cdict.h"
+
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+// JNI IDs for the Result class.
+static struct
+{
+  jclass class;
+  jfieldID found;
+  jfieldID index;
+  jfieldID prefix_ptr;
+} Result;
+
+static jobject result_to_java(JNIEnv *env, cdict_result_t const *result)
+{
+  jobject jresult = (*env)->AllocObject(env, Result.class);
+  (*env)->SetBooleanField(env, jresult, Result.found, result->found);
+  (*env)->SetIntField(env, jresult, Result.index, result->index);
+  (*env)->SetIntField(env, jresult, Result.prefix_ptr, result->prefix_ptr);
+  return jresult;
+}
+
+static void result_of_java(JNIEnv *env, jobject jresult, cdict_result_t *dst)
+{
+  dst->found = (*env)->GetBooleanField(env, jresult, Result.found);
+  dst->index = (*env)->GetIntField(env, jresult, Result.index);
+  dst->prefix_ptr = (*env)->GetIntField(env, jresult, Result.prefix_ptr);
+}
+
+static jarray jarray_of_int_array(JNIEnv *env, int const *src, int len)
+{
+  jarray ar = (*env)->NewIntArray(env, len);
+  (*env)->SetIntArrayRegion(env, ar, 0, len, src);
+  return ar;
+}
+
+/** Define a local var array for storing a Java string converted to UTF-8.
+    The biggest jchar is 0xFFFF, which requires 3 bytes in UTF-8.
+    Surrogate pairs (4 jchars) require 4 bytes in UTF-8. Allocate 3 bytes for
+    every jchar and leave room for the final NUL char. */
+#define STACK_ALLOCATED_GETSTRINGUTF(VARNAME, JWORD) \
+  int jword_len = (*env)->GetStringLength(env, JWORD); \
+  char VARNAME[jword_len * 3 + 1]; \
+  (*env)->GetStringUTFRegion(env, JWORD, 0, jword_len, VARNAME);
+
+/** Methods */
+
+JNIEXPORT void JNICALL Java_juloo_cdict_Cdict_init(JNIEnv *env, jclass jcls)
+{
+  Result.class =
+    (*env)->NewGlobalRef(env,
+        (*env)->FindClass(env, "juloo/cdict/Cdict$Result"));
+  Result.found = (*env)->GetFieldID(env, Result.class, "found", "Z");
+  Result.index = (*env)->GetFieldID(env, Result.class, "index", "I");
+  Result.prefix_ptr = (*env)->GetFieldID(env, Result.class, "prefix_ptr", "I");
+}
+
+JNIEXPORT jlong JNICALL Java_juloo_cdict_Cdict_of_1bytes_1native
+  (JNIEnv *env, jclass _cls, jbyteArray data)
+{
+  int const len = (*env)->GetArrayLength(env, data);
+  // Allocate and copy the dictionary data on the C heap.
+  void *dict = malloc(sizeof(cdict_t) + len);
+  void *dict_data = dict + sizeof(cdict_t);
+  (*env)->GetByteArrayRegion(env, data, 0, len, dict_data);
+  *(cdict_t*)dict = cdict_of_string(dict_data, len);
+  return (jlong)dict;
+}
+
+JNIEXPORT jobject JNICALL Java_juloo_cdict_Cdict_find_1native
+  (JNIEnv *env, jclass _cls, jlong dictl, jstring jword)
+{
+  cdict_t const *dict = (cdict_t const*)dictl;
+  STACK_ALLOCATED_GETSTRINGUTF(cword, jword);
+  cdict_result_t result;
+  cdict_find(dict, cword, strlen(cword), &result);
+  return result_to_java(env, &result);
+}
+
+JNIEXPORT jint JNICALL Java_juloo_cdict_Cdict_freq_1native
+  (JNIEnv *_env, jclass _cls, jlong dictl, jint index)
+{
+  cdict_t const *dict = (cdict_t const*)dictl;
+  return cdict_freq(dict, index);
+}
+
+JNIEXPORT jstring JNICALL Java_juloo_cdict_Cdict_word_1native
+  (JNIEnv *env, jclass _cls, jlong dictl, jint index)
+{
+  cdict_t const *dict = (cdict_t const*)dictl;
+  int const max_len = 256;
+  char dst[max_len + 1];
+  int len = cdict_word(dict, index, dst, max_len);
+  dst[len] = '\0';
+  return (*env)->NewStringUTF(env, dst);
+}
+
+JNIEXPORT jintArray JNICALL Java_juloo_cdict_Cdict_suffixes_1native
+  (JNIEnv *env, jclass _cls, jlong dictl, jobject jresult, jint count)
+{
+  cdict_t const *dict = (cdict_t const*)dictl;
+  cdict_result_t result;
+  result_of_java(env, jresult, &result);
+  int indexes[count];
+  int final_len = cdict_suffixes(dict, &result, indexes, count);
+  return jarray_of_int_array(env, indexes, final_len);
+}
+
+JNIEXPORT jintArray JNICALL Java_juloo_cdict_Cdict_distance_1native
+  (JNIEnv *env, jclass _cls, jlong dictl, jstring jword, jint distance,
+   jint count)
+{
+  cdict_t const *dict = (cdict_t const*)dictl;
+  STACK_ALLOCATED_GETSTRINGUTF(cword, jword);
+  int indexes[count];
+  int final_len = cdict_distance(dict, cword, strlen(cword), distance,
+      indexes, count);
+  return jarray_of_int_array(env, indexes, final_len);
+}
