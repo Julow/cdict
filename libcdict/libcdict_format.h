@@ -44,7 +44,7 @@ typedef enum
 #define PTR_FLAG_FINAL 0b100u
 
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
-#define PTR_NUMBER(PTR) (((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
+#define PTR_NUMBER(PTR) (int)(((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
 #define PTR_OFFSET(PTR) ((PTR) & PTR_OFFSET_MASK)
 #define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
 
