@@ -55,7 +55,7 @@
   close match: "Function" distance=2 freq=10
   close match: "function\226\128\153s" distance=2 freq=5
   found: "value" freq=15 index=7722
-  prefix: "valuerestrictio" freq=0 index=7723
+  prefix: "valuerestriction" freq=0 index=7723
   prefix: "value" freq=15 index=7722
   close match: "vanilla" distance=1 freq=5
   close match: "vanishes" distance=1 freq=0
@@ -63,10 +63,10 @@
   close match: "Value" distance=1 freq=8
   close match: "values" distance=1 freq=15
   close match: "values" distance=2 freq=15
-  close match: "valuerestrictio" distance=2 freq=0
+  close match: "valuerestriction" distance=2 freq=0
   close match: "Value" distance=2 freq=8
   close match: "archive" distance=2 freq=0
-  close match: "valuerestrictio" distance=2 freq=0
+  close match: "valuerestriction" distance=2 freq=0
   found: "match" freq=15 index=5267
   prefix: "matching" freq=15 index=5270
   prefix: "matches" freq=14 index=5269
