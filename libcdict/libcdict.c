@@ -276,8 +276,8 @@ static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
       suffixes_branches(dict, off, index, dst);
       break;
     case PREFIX:
-      prefix_t const *p = dict->data + off;
-      suffixes(dict, PREFIX_NEXT_PTR(p), index, dst);
+      suffixes(dict, PREFIX_NEXT_PTR((prefix_t const*)(dict->data + off)),
+          index, dst);
       break;
   }
 }
