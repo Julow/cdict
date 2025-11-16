@@ -28,7 +28,6 @@ typedef enum
 {
   BRANCHES = 0b000,
   PREFIX = 0b001,
-  NUMBER = 0b011,
 } kind_t;
 
 #define MAX_PTR_NUMBER 0xFFu
@@ -57,16 +56,36 @@ corresponding pointer in 'branches'.
 
 typedef struct
 {
-  char length;
+  uint8_t header;
+  /** Encode the format of the 'numbers' array. */
+  uint8_t length;
   /** Length of the 'labels' and 'branches' arrays. Not the offset to the
       'branches' array. */
   char labels[];
   // ptr_t branches[]; /** Use [BRANCHES(b)] to access. */
+  // char numbers_256[];
+  // /** Number divided by MAX_PTR_NUMBER. Use [NUMBERS(b)] to access. */
 } branches_t;
 
 /** Pointer to the 'branches' array. */
 #define BRANCHES(B) ((ptr_t const*)(((void const*)(B)) + \
     ((sizeof(branches_t) + (B)->length + 3) & -4)))
+
+/** Pointer to the 'numbers' array. Format depends on the 'header'. */
+#define BRANCHES_NUMBERS(B, TYP) ((TYP const *)(((void const*)(B)) + \
+      ((sizeof(branches_t) + (B)->length * (1 + sizeof(ptr_t)) + 3) & -4)))
+
+/** Format of the 'numbers' array.
+    The numbers array is accessed using [BRANCHES_NUMBERS(B)] and the size of
+    the elements depend on the format. */
+typedef enum
+{
+  NUMBERS_NONE = 0,
+  NUMBERS_8_BITS = 1,
+  NUMBERS_16_BITS = 2,
+} branches_numbers_format_t;
+
+#define BRANCHES_NUMBERS_FORMAT_MASK 0b11
 
 /** PREFIX nodes (size = 8 bytes)
 
@@ -86,22 +105,6 @@ typedef struct
 
 #define PREFIX_NEXT_PTR(P) ((P)->next_ptr_and_len & ~PTR_NUMBER_MASK)
 #define PREFIX_LENGTH(P) PTR_NUMBER((P)->next_ptr_and_len)
-
-/** NUMBER nodes (size = 8 bytes)
-
-A non-branching node that stores a pointer to a next state. It is used to
-workaround the limited storage for the 'number' field in pointers by adding an
-indirection.
-This node doesn't consume any prefix.
-
-This node is never final.
-*/
-
-typedef struct
-{
-  int32_t number;
-  ptr_t next;
-} number_t;
 
 /** Dictionary header (size = 8 bytes)
 

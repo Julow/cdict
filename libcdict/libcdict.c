@@ -17,6 +17,19 @@ cdict_t cdict_of_string(char const *data, int size)
   return dict;
 }
 
+static inline int branches_number(branches_t const *b, int branch_i)
+{
+  switch (b->header & BRANCHES_NUMBERS_FORMAT_MASK)
+  {
+    case NUMBERS_8_BITS:
+      return BRANCHES_NUMBERS(b, uint8_t)[branch_i] * MAX_PTR_NUMBER;
+    case NUMBERS_16_BITS:
+      return BRANCHES_NUMBERS(b, uint16_t)[branch_i] * MAX_PTR_NUMBER;
+    case NUMBERS_NONE:
+    default: return 0;
+  }
+}
+
 /** ************************************************************************
     cdict_find
     ************************************************************************ */
@@ -37,6 +50,7 @@ static void cdict_find_branches(void const *data, int32_t off,
     char l = b->labels[i];
     if (c == l)
     {
+      index += branches_number(b, i);
       cdict_find_node(data, BRANCHES(b)[i], word + 1, end, index, result);
       return;
     }
@@ -62,13 +76,6 @@ static void cdict_find_prefix(void const *data, int32_t off,
   cdict_find_node(data, PREFIX_NEXT_PTR(node), word, end, index, result);
 }
 
-static void cdict_find_number(void const *data, int32_t off,
-    char const *word, char const *end, int index, cdict_result_t *result)
-{
-  number_t const *n = data + off;
-  cdict_find_node(data, n->next, word, end, index + n->number, result);
-}
-
 static void cdict_find_node(void const *data, ptr_t ptr,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
@@ -89,7 +96,6 @@ static void cdict_find_node(void const *data, ptr_t ptr,
     case BRANCHES:
       return cdict_find_branches(data, off, word, end, index, result);
     case PREFIX: return cdict_find_prefix(data, off, word, end, index, result);
-    case NUMBER: return cdict_find_number(data, off, word, end, index, result);
     default: return;
   }
 }
@@ -123,37 +129,32 @@ int cdict_freq(cdict_t const *dict, int index)
 static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
     int dsti, int max_len);
 
-/** The number field of a pointer + the number field of the next node if it is
-    a NUMBER node. */
-static inline int ptr_number_next(void const *data, ptr_t ptr)
-{
-  int next_number = 0;
-  if (PTR_KIND(ptr) == NUMBER)
-    next_number = ((number_t const*)(data + PTR_OFFSET(ptr)))->number;
-  return PTR_NUMBER(ptr) + next_number;
-}
-
 static int cdict_word_branches(void const *data, uint32_t off, int index,
     char *dst, int dsti, int max_len)
 {
   branches_t const *b = data + off;
+  // The 'number' field of each transition is in the same order as the labels.
   int len = b->length;
   ptr_t next = 0;
+  int next_number = 0;
   for (int i = 0; i < len;)
   {
+    int ni = branches_number(b, i);
     ptr_t bi = BRANCHES(b)[i];
-    if (ptr_number_next(data, bi) > index)
+    if (PTR_NUMBER(bi) + ni > index)
       i = i * 2 + 1;
     else
     {
       next = bi;
+      next_number = ni;
       dst[dsti] = b->labels[i];
       i = i * 2 + 2;
     }
   }
   if (next == 0)
     return dsti;
-  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
+  return cdict_word_node(data, next, index - next_number, dst, dsti + 1,
+      max_len);
 }
 
 static int cdict_word_prefix(void const *data, uint32_t off, int index,
@@ -167,13 +168,6 @@ static int cdict_word_prefix(void const *data, uint32_t off, int index,
   while (dsti < end)
     dst[dsti++] = *(prefix++);
   return cdict_word_node(data, PREFIX_NEXT_PTR(b), index, dst, end, max_len);
-}
-
-static int cdict_word_number(void const *data, uint32_t off, int index,
-    char *dst, int dsti, int max_len)
-{
-  number_t const *n = data + off;
-  return cdict_word_node(data, n->next, index - n->number, dst, dsti, max_len);
 }
 
 static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
@@ -193,7 +187,6 @@ static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
   {
     case BRANCHES: return cdict_word_branches(data, off, index, dst, dsti, max_len);
     case PREFIX: return cdict_word_prefix(data, off, index, dst, dsti, max_len);
-    case NUMBER: return cdict_word_number(data, off, index, dst, dsti, max_len);
   }
   return dsti;
 }
@@ -265,7 +258,7 @@ static void suffixes_branches(cdict_t const *dict, uint32_t off, int index,
   int len = b->length;
   // TODO: Iterate branches in sorted order
   for (int i = 0; i < len; i++)
-    suffixes(dict, BRANCHES(b)[i], index, dst);
+    suffixes(dict, BRANCHES(b)[i], index + branches_number(b, i), dst);
 }
 
 static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
@@ -285,10 +278,6 @@ static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
     case PREFIX:
       prefix_t const *p = dict->data + off;
       suffixes(dict, PREFIX_NEXT_PTR(p), index, dst);
-      break;
-    case NUMBER:
-      number_t const *n = dict->data + off;
-      suffixes(dict, n->next, index + n->number, dst);
       break;
   }
 }
@@ -322,11 +311,12 @@ static void distance_branches(cdict_t const *dict, uint32_t off, char const *wor
   char c = *word;
   for (int i = 0; i < len; i++)
   {
+    int next_index = index + branches_number(b, i);
     // Change a letter
-    distance(dict, BRANCHES(b)[i], word + 1, end, index,
+    distance(dict, BRANCHES(b)[i], word + 1, end, next_index,
         (c == b->labels[i]) ? dist : dist - 1, q);
     // Add a letter
-    distance(dict, BRANCHES(b)[i], word, end, index, dist - 1, q);
+    distance(dict, BRANCHES(b)[i], word, end, next_index, dist - 1, q);
   }
 }
 
@@ -385,10 +375,6 @@ static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
       return distance_branches(dict, off, word, end, index, dist, q);
     case PREFIX:
       return distance_prefix(dict, off, word, end, index, dist, q);
-    case NUMBER:
-      number_t const *number = dict->data + off;
-      return distance(dict, number->next, word, end, index + number->number,
-          dist, q);
   }
 }
 

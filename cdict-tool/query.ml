@@ -9,8 +9,9 @@ let queries_from_file = function
 let query_distance dict ~dist q =
   Cdict.distance dict q ~dist ~count:5
   |> Array.iter (fun idx ->
-         Printf.printf "close match: %S distance=%d freq=%d\n"
-           (Cdict.word dict idx) dist (Cdict.freq dict idx))
+         Printf.printf "close match: %S distance=%d freq=%d index=%d\n"
+           (Cdict.word dict idx) dist (Cdict.freq dict idx)
+           (idx :> int))
 
 let query ~quiet dict q =
   let r : Cdict.result = Cdict.find dict q in

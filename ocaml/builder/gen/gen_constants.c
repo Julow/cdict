@@ -28,29 +28,28 @@ int main()
 
   VAL(c_, MAX_PTR_NUMBER);
   VAL(c_, PTR_NUMBER_OFFSET);
+  VAL(c_, NUMBERS_NONE);
+  VAL(c_, NUMBERS_8_BITS);
+  VAL(c_, NUMBERS_16_BITS);
   VAL_INT32(mask_, PTR_KIND_MASK);
   VAL_INT32(mask_, PTR_FLAGS_MASK);
   VAL_INT32(mask_, PTR_OFFSET_MASK);
   VAL_INT32(mask_, PTR_NUMBER_MASK);
+  VAL_INT32(mask_, BRANCHES_NUMBERS_FORMAT_MASK);
   VAL_INT32(flag_, PTR_FLAG_FINAL);
   VAL_INT32(tag_, BRANCHES);
   VAL_INT32(tag_, PREFIX);
-  VAL_INT32(tag_, NUMBER);
 
   end();
   module("O");
 
+  FIELD(branches_t, header);
   FIELD(branches_t, length);
   FIELD(branches_t, labels);
-
   FIELD(prefix_t, next_ptr_and_len);
   FIELD(prefix_t, prefix);
-
   FIELD(header_t, root_ptr);
   FIELD(header_t, freq_off);
-
-  FIELD(number_t, number);
-  FIELD(number_t, next);
 
   end();
   module("S");
@@ -59,7 +58,6 @@ int main()
   SIZE(branches_t);
   SIZE(prefix_t);
   SIZE(header_t);
-  SIZE(number_t);
 
   end();
   return 0;

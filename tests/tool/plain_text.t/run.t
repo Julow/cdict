@@ -9,4 +9,4 @@
 TODO: Some words are not found back due to some encoding issues.
 
   $ cdict-tool query -q dict --from-file ocaml_manual.txt
-  [128]
+  [3]
