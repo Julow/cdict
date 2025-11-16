@@ -229,24 +229,15 @@ end
 module Writer = struct
   open Buf.Open
 
-  let[@inline] align8 offset =
-    let down = offset land lnot 7 in
-    if down = offset then down else down + 8
-
   let[@inline] align4 offset =
     let down = offset land lnot 3 in
     if down = offset then down else down + 4
 
   module Seen = Optimized.IdMap
 
-  (** The [align] (defaults to [true]) option allows writing unaligned nodes.
-      Unaligned node cannot be referenced with a pointer and [Ptr.w] will raise
-      an exception if it encounters one. Unaligned nodes are still aligned to a
-      4-bytes boundary, as that's a requirement to make the C code efficient.
-      The C code never does 64-bits access into the dictionary. *)
-  let alloc ?(align = true) b n =
+  let alloc b n =
     let off = b.Buf.end_ in
-    let off = if align then align8 off else align4 off in
+    let off = align4 off in
     let end_ = off + n in
     b.end_ <- end_;
     let b_len = Bytes.length b.b in
@@ -256,10 +247,10 @@ module Writer = struct
       b.b <- newb);
     off
 
-  let rec write_node seen ?align b nodes { Optimized.final; number; next } =
-    write_node' seen ?align b nodes ~final ~number next
+  let rec write_node seen b nodes { Optimized.final; number; next } =
+    write_node' seen b nodes ~final ~number next
 
-  and write_node' seen ?align b nodes ~final ~number next =
+  and write_node' seen b nodes ~final ~number next =
     let kind, offset =
       match Seen.find_opt next !seen with
       | Some node -> node
@@ -268,18 +259,17 @@ module Writer = struct
             match Optimized.find next nodes with
             (* | exception Not_found -> . *)
             | Optimized.Prefix (p, tr) ->
-                (`Prefix, write_prefix_node seen ?align b nodes p tr)
-            | Branches brs ->
-                (`Branches, write_branches_node seen ?align b nodes brs)
+                (`Prefix, write_prefix_node seen b nodes p tr)
+            | Branches brs -> (`Branches, write_branches_node seen b nodes brs)
           in
           seen := Seen.add next node !seen;
           node
     in
     Ptr.v ~final ~number kind offset
 
-  and write_prefix_node seen ?align b nodes p next =
+  and write_prefix_node seen b nodes p next =
     let len = String.length p in
-    let off = alloc ?align b (S.prefix_t + len) in
+    let off = alloc b (S.prefix_t + len) in
     let next_ptr :> int32 = write_node seen b nodes next in
     assert (Int32.logand next_ptr C.mask_PTR_NUMBER_MASK = 0l);
     let next_ptr =
@@ -292,7 +282,7 @@ module Writer = struct
   and write_numbers w_number number_byte_size numbers b off =
     Array.iteri (fun i n -> w_number b off (i * number_byte_size) n) numbers
 
-  and write_branches_node seen ?align b nodes { labels; branches; numbers } =
+  and write_branches_node seen b nodes { labels; branches; numbers } =
     let length = String.length labels in
     let branch_start_off = align4 (S.branches_t + length) in
     let numbers_start_off = branch_start_off + (length * S.ptr_t) in
@@ -302,9 +292,7 @@ module Writer = struct
       | Some (`I16, n) -> (2, C.c_NUMBERS_16_BITS, write_numbers w_uint16 2 n)
       | None -> (0, C.c_NUMBERS_NONE, fun _ _ -> ())
     in
-    let off =
-      alloc ?align b (numbers_start_off + (length * number_byte_size))
-    in
+    let off = alloc b (numbers_start_off + (length * number_byte_size)) in
     let branch_off i = branch_start_off + (i * S.ptr_t) in
     let header = numbers_format in
     (* Ensure the padding is zero'd *)

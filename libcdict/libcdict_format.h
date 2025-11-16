@@ -30,16 +30,16 @@ typedef enum
   PREFIX = 0b001,
 } kind_t;
 
+/** Whether the pointer is a final transition. */
+#define PTR_FLAG_FINAL 0b10u
+
 #define MAX_PTR_NUMBER 0xFFu
 #define PTR_NUMBER_OFFSET 24
 
-#define PTR_KIND_MASK 0b011u
-#define PTR_FLAGS_MASK 0b100u
+#define PTR_KIND_MASK 0b1u
+#define PTR_FLAGS_MASK PTR_FLAG_FINAL
 #define PTR_NUMBER_MASK (MAX_PTR_NUMBER << PTR_NUMBER_OFFSET)
 #define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
-
-/** Whether the pointer is a final transition. */
-#define PTR_FLAG_FINAL 0b100u
 
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
 #define PTR_NUMBER(PTR) (int)(((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
