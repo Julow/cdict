@@ -4,9 +4,9 @@
   Done.
 
   $ ls -sh dict
-  88K dict
+  80K dict
 
 TODO: Some words are not found back due to some encoding issues.
 
   $ cdict-tool query -q dict --from-file ocaml_manual.txt
-  [201]
+  [128]

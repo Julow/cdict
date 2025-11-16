@@ -29,17 +29,22 @@ static void cdict_find_branches(void const *data, int32_t off,
 {
   branches_t const *b = data + off;
   char c = *word;
-  while (c >= b->low + b->length)
+  int len = b->length;
+  for (int i = 0; i < len;)
   {
-    if (b->has_next == 0)
+    // [l] is NUL when stepping outside of the tree but [k] cannot be NUL so we
+    // don't have to check for this case.
+    char l = b->labels[i];
+    if (c == l)
+    {
+      cdict_find_node(data, BRANCHES(b)[i], word + 1, end, index, result);
       return;
-    b = BRANCHES_NEXT(b);
+    }
+    else if (c < l)
+      i = i * 2 + 1;
+    else
+      i = i * 2 + 2;
   }
-  if (c < b->low)
-    return;
-  ptr_or_null_t next = b->branches[c - b->low];
-  if (next > 0)
-    cdict_find_node(data, next, word + 1, end, index, result);
 }
 
 static void cdict_find_prefix(void const *data, int32_t off,
@@ -55,33 +60,6 @@ static void cdict_find_prefix(void const *data, int32_t off,
     if (word == end) return; // Query ends
   }
   cdict_find_node(data, PREFIX_NEXT_PTR(node), word, end, index, result);
-}
-
-static void cdict_find_btree(void const *data, int32_t off,
-    char const *word, char const *end, int index, cdict_result_t *result)
-{
-  btree_t const *b = data + off;
-  char k = *word;
-  // This node cannot match a NUL byte because it is used in the encoding of
-  // the tree.
-  if (k == 0)
-    return;
-  int i = 0;
-  while (i < BTREE_NODE_LENGTH)
-  {
-    // [l] is NUL when stepping outside of the tree but [k] cannot be NUL so we
-    // don't have to check for this case.
-    char l = b->labels[i];
-    if (k == l)
-    {
-      cdict_find_node(data, b->next[i], word + 1, end, index, result);
-      return;
-    }
-    else if (k < l)
-      i = i * 2 + 1;
-    else
-      i = i * 2 + 2;
-  }
 }
 
 static void cdict_find_number(void const *data, int32_t off,
@@ -111,7 +89,6 @@ static void cdict_find_node(void const *data, ptr_t ptr,
     case BRANCHES:
       return cdict_find_branches(data, off, word, end, index, result);
     case PREFIX: return cdict_find_prefix(data, off, word, end, index, result);
-    case BTREE: return cdict_find_btree(data, off, word, end, index, result);
     case NUMBER: return cdict_find_number(data, off, word, end, index, result);
     default: return;
   }
@@ -160,27 +137,23 @@ static int cdict_word_branches(void const *data, uint32_t off, int index,
     char *dst, int dsti, int max_len)
 {
   branches_t const *b = data + off;
-  if (b->length == 0)
+  int len = b->length;
+  ptr_t next = 0;
+  for (int i = 0; i < len;)
+  {
+    ptr_t bi = BRANCHES(b)[i];
+    if (ptr_number_next(data, bi) > index)
+      i = i * 2 + 1;
+    else
+    {
+      next = bi;
+      dst[dsti] = b->labels[i];
+      i = i * 2 + 2;
+    }
+  }
+  if (next == 0)
     return dsti;
-  while (b->has_next)
-  {
-    branches_t const *next_b = BRANCHES_NEXT(b);
-    if (ptr_number_next(data, next_b->branches[0]) > index)
-      break; // branches[0] is never equal to 0
-    b = next_b;
-  }
-  int i = 0;
-  while (true)
-  {
-    int j = i + 1;
-    while (j < b->length && b->branches[j] == 0)
-      j++;
-    if (j >= b->length || ptr_number_next(data, b->branches[j]) > index)
-      break;
-    i = j;
-  }
-  dst[dsti] = b->low + i;
-  return cdict_word_node(data, b->branches[i], index, dst, dsti + 1, max_len);
+  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
 }
 
 static int cdict_word_prefix(void const *data, uint32_t off, int index,
@@ -203,25 +176,6 @@ static int cdict_word_number(void const *data, uint32_t off, int index,
   return cdict_word_node(data, n->next, index - n->number, dst, dsti, max_len);
 }
 
-static int cdict_word_btree(void const *data, uint32_t off, int index,
-    char *dst, int dsti, int max_len)
-{
-  btree_t const *b = data + off;
-  ptr_t next = 0;
-  for (int i = 0; i < BTREE_NODE_LENGTH && b->labels[i] != 0; )
-  {
-    if (PTR_NUMBER(b->next[i]) > index)
-      i = i * 2 + 1;
-    else
-    {
-      next = b->next[i];
-      dst[dsti] = b->labels[i];
-      i = i * 2 + 2;
-    }
-  }
-  return cdict_word_node(data, next, index, dst, dsti + 1, max_len);
-}
-
 static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
     int dsti, int max_len)
 {
@@ -239,7 +193,6 @@ static int cdict_word_node(void const *data, ptr_t ptr, int index, char *dst,
   {
     case BRANCHES: return cdict_word_branches(data, off, index, dst, dsti, max_len);
     case PREFIX: return cdict_word_prefix(data, off, index, dst, dsti, max_len);
-    case BTREE: return cdict_word_btree(data, off, index, dst, dsti, max_len);
     case NUMBER: return cdict_word_number(data, off, index, dst, dsti, max_len);
   }
   return dsti;
@@ -309,26 +262,10 @@ static void suffixes_branches(cdict_t const *dict, uint32_t off, int index,
     priority_t *dst)
 {
   branches_t const *b = dict->data + off;
-  while (true)
-  {
-    for (int j = 0; j < b->length; j++)
-    {
-      if (b->branches[j] != 0)
-        suffixes(dict, b->branches[j], index, dst);
-    }
-    if (b->has_next == 0)
-      break;
-    b = BRANCHES_NEXT(b);
-  }
-}
-
-// TODO: Iterate btree nodes in sorted order
-static void suffixes_btree(cdict_t const *dict, uint32_t off, int index,
-    priority_t *dst)
-{
-  btree_t const *b = dict->data + off;
-  for (int j = 0; j < BTREE_NODE_LENGTH && b->labels[j] != 0; j++)
-    suffixes(dict, b->next[j], index, dst);
+  int len = b->length;
+  // TODO: Iterate branches in sorted order
+  for (int i = 0; i < len; i++)
+    suffixes(dict, BRANCHES(b)[i], index, dst);
 }
 
 static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
@@ -348,9 +285,6 @@ static void suffixes(cdict_t const *dict, ptr_t ptr, int index, priority_t *dst)
     case PREFIX:
       prefix_t const *p = dict->data + off;
       suffixes(dict, PREFIX_NEXT_PTR(p), index, dst);
-      break;
-    case BTREE:
-      suffixes_btree(dict, off, index, dst);
       break;
     case NUMBER:
       number_t const *n = dict->data + off;
@@ -384,36 +318,15 @@ static void distance_branches(cdict_t const *dict, uint32_t off, char const *wor
     char const *end, int index, int dist, priority_t *q)
 {
   branches_t const *b = dict->data + off;
-  while (true)
-  {
-    char c = *word - b->low;
-    for (int i = 0; i < b->length; i++)
-    {
-      ptr_or_null_t tr = b->branches[i];
-      if (tr == 0) continue;
-      // Change a letter
-      distance(dict, tr, word + 1, end, index, ((c == i) ? dist : dist - 1), q);
-      // Add a letter
-      distance(dict, tr, word, end, index, dist - 1, q);
-    }
-    if (!b->has_next)
-      return;
-    b = BRANCHES_NEXT(b);
-  }
-}
-
-static void distance_btree(cdict_t const *dict, uint32_t off, char const *word,
-    char const *end, int index, int dist, priority_t *q)
-{
-  btree_t const *b = dict->data + off;
+  int len = b->length;
   char c = *word;
-  for (int i = 0; i < BTREE_NODE_LENGTH && b->labels[i] != 0; i++)
+  for (int i = 0; i < len; i++)
   {
     // Change a letter
-    distance(dict, b->next[i], word + 1, end, index,
+    distance(dict, BRANCHES(b)[i], word + 1, end, index,
         (c == b->labels[i]) ? dist : dist - 1, q);
     // Add a letter
-    distance(dict, b->next[i], word, end, index, dist - 1, q);
+    distance(dict, BRANCHES(b)[i], word, end, index, dist - 1, q);
   }
 }
 
@@ -472,8 +385,6 @@ static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
       return distance_branches(dict, off, word, end, index, dist, q);
     case PREFIX:
       return distance_prefix(dict, off, word, end, index, dist, q);
-    case BTREE:
-      return distance_btree(dict, off, word, end, index, dist, q);
     case NUMBER:
       number_t const *number = dict->data + off;
       return distance(dict, number->next, word, end, index + number->number,

@@ -28,7 +28,6 @@ typedef enum
 {
   BRANCHES = 0b000,
   PREFIX = 0b001,
-  BTREE = 0b010,
   NUMBER = 0b011,
 } kind_t;
 
@@ -50,35 +49,24 @@ typedef enum
 
 /** BRANCHES nodes (size = 4 bytes + array)
 
-A branching node that consumes 1 byte from the query.
-
-The 'branches' fields is an array of node pointers indexed by the first byte of
-the query, minus the 'low' value.
-Node pointers are NULL when the queried word is not in the dictionary.
-If the first byte of the query is greater than 'low + length - 1'
-and 'has_next' is 1, the query should be tried again on the branches node at
-the offset BRANCHES_NEXT(B). However, if 'has_next' is 0, no prefix higher than
-'low + length - 1' are present in the dictionary.
-
-The 'low', 'length' and 'has_next' can be used during construction to
-remove regions or NULL pointers at the beginning and at the end of the
-array, as well as inside the array if that reduces the total size.
+A branching node that consumes 1 byte from the query. The branch labels are
+stored in a binary search tree.
+First search for the current byte prefix into 'labels' then lookup the
+corresponding pointer in 'branches'.
 */
 
 typedef struct
 {
-  char low; /** Lowest value represented by the node. */
-  char length; /** Length of the 'branches' array in number of pointers. */
-  char has_next; /** Whether a branches node follow after this one. */
-  char padding; /** No meaning. */
-  ptr_or_null_t branches[];
+  char length;
+  /** Length of the 'labels' and 'branches' arrays. Not the offset to the
+      'branches' array. */
+  char labels[];
+  // ptr_t branches[]; /** Use [BRANCHES(b)] to access. */
 } branches_t;
 
-/** Size in bytes of the branches node [B]. */
-#define BRANCHES_SIZE(B) (sizeof(branches_t) + (B).length * sizeof(ptr_or_null_t))
-/** Offset to the next [branches_t] node when [has_next]. Argument [B_PTR]
-    appears twice. */
-#define BRANCHES_NEXT(B_PTR) (((void*)(B_PTR)) + BRANCHES_SIZE(*(B_PTR)))
+/** Pointer to the 'branches' array. */
+#define BRANCHES(B) ((ptr_t const*)(((void const*)(B)) + \
+    ((sizeof(branches_t) + (B)->length + 3) & -4)))
 
 /** PREFIX nodes (size = 8 bytes)
 
@@ -98,24 +86,6 @@ typedef struct
 
 #define PREFIX_NEXT_PTR(P) ((P)->next_ptr_and_len & ~PTR_NUMBER_MASK)
 #define PREFIX_LENGTH(P) PTR_NUMBER((P)->next_ptr_and_len)
-
-/** BTREE nodes (size = 8 bytes to 40 bytes)
-
-A branching node where the branch labels are stored in a binary search tree.
-First search for the current byte prefix into 'labels' then lookup the
-corresponding pointer in 'next'.
-
-This node doesn't support NUL prefixes, finding a NUL in 'labels' means that
-the end of tree was reached.
-*/
-
-#define BTREE_NODE_LENGTH 8
-
-typedef struct
-{
-  char labels[BTREE_NODE_LENGTH];
-  ptr_t next[]; // Size might be lower than BTREE_NODE_LENGTH, check [labels].
-} btree_t;
 
 /** NUMBER nodes (size = 8 bytes)
 
