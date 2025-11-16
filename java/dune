@@ -8,7 +8,9 @@
 
 (rule
  (target libcdict_java.so)
- (deps gen_interfaces ../libcdict/libcdict.h)
+ (deps
+  (source_tree jni)
+  ../libcdict/libcdict.h)
  (action
   (run
    %{cc}
@@ -18,7 +20,7 @@
    -I
    ../libcdict
    -I
-   gen_interfaces
+   jni
    %{dep:../libcdict/libcdict.o}
    %{dep:jni/juloo_cdict_Cdict.c})))
 
@@ -27,3 +29,11 @@
  (deps classes)
  (action
   (run jar -cf %{target} -C classes/ .)))
+
+(subdir
+ jni
+ (rule
+  (mode promote)
+  (package cdict-java)
+  (action
+   (copy ../gen_interfaces/juloo_cdict_Cdict.h juloo_cdict_Cdict.h))))
