@@ -309,42 +309,73 @@ static void distance_branches(cdict_t const *dict, uint32_t off, char const *wor
   branches_t const *b = dict->data + off;
   int len = b->length;
   char c = *word;
+  ptr_t const *branches = BRANCHES(b);
   for (int i = 0; i < len; i++)
   {
     int next_index = index + branches_number(b, i);
-    // Change a letter
-    distance(dict, BRANCHES(b)[i], word + 1, end, next_index,
-        (c == b->labels[i]) ? dist : dist - 1, q);
-    // Add a letter
-    distance(dict, BRANCHES(b)[i], word, end, next_index, dist - 1, q);
+    if (c == b->labels[i])
+    {
+      distance(dict, branches[i], word + 1, end, next_index, dist, q);
+    }
+    else
+    {
+      // Change a letter
+      distance(dict, branches[i], word + 1, end, next_index, dist - 1, q);
+      // Add a letter
+      distance(dict, branches[i], word, end, next_index, dist - 1, q);
+    }
   }
 }
 
-static void distance_prefix_(cdict_t const *dict, prefix_t const *p, int i,
-    char const *word, char const *end, int index, int dist, priority_t *q)
+static inline int min(int a, int b) { return (a < b) ? a : b; }
+
+/** Levenshtein distance between the strings 'a' and 'b'. */
+static int levenshtein_distance(char const *a, int a_length,
+    char const *b, int b_length)
 {
-  if (i == PREFIX_LENGTH(p))
-    return distance(dict, PREFIX_NEXT_PTR(p), word, end, index, dist, q);
-  if (word == end)
-    return;
-  if (dist > 0)
+  // From https://en.wikipedia.org/wiki/Levenshtein_distance
+  int array[(b_length + 1) * 2];
+  int *v0 = array;
+  int *v1 = v0 + b_length + 1;
+  for (int i = 0; i <= b_length; i++)
+    v0[i] = i;
+  for (int i = 0; i < a_length; i++)
   {
-    // Remove a letter
-    distance_prefix_(dict, p, i, word + 1, end, index, dist - 1, q);
-    // Add a letter
-    distance_prefix_(dict, p, i + 1, word, end, index, dist - 1, q);
-    // Change a letter
-    if (*word != p->prefix[i])
-      distance_prefix_(dict, p, i + 1, word + 1, end, index, dist - 1, q);
+    v1[0] = i + 1;
+    for (int j = 0; j < b_length; j++)
+    {
+      int del = v0[j + 1] + 1;
+      int ins = v1[j] + 1;
+      int rpl = v0[j] + ((a[i] == b[j]) ? 0 : 1);
+      v1[j + 1] = min(del, min(ins, rpl));
+    }
+    int *swap = v0;
+    v0 = v1; v1 = swap;
   }
-  if (*word == p->prefix[i])
-    return distance_prefix_(dict, p, i + 1, word + 1, end, index, dist, q);
+  return v0[b_length];
 }
 
 static void distance_prefix(cdict_t const *dict, uint32_t off, char const *word,
     char const *end, int index, int dist, priority_t *q)
 {
-  distance_prefix_(dict, dict->data + off, 0, word, end, index, dist, q);
+  prefix_t const *p = dict->data + off;
+  int len = PREFIX_LENGTH(p);
+  int word_len = ((intptr_t)end) - ((intptr_t)word);
+  int common_len = min(word_len, len);
+  int pdist = levenshtein_distance(word, common_len, p->prefix, common_len);
+  if (word_len < len)
+  {
+    if (pdist + 1 == dist)
+      suffixes(dict, PREFIX_NEXT_PTR(p), index, q);
+    return;
+  }
+  int next_dist = dist - pdist;
+  for (int i = len; i >= 0 && next_dist >= 0; i--)
+  {
+    // Add suffixes of 'p', including the empty suffix.
+    distance(dict, PREFIX_NEXT_PTR(p), word + i, end, index, next_dist, q);
+    next_dist--;
+  }
 }
 
 static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
@@ -356,22 +387,24 @@ static void distance(cdict_t const *dict, ptr_t ptr, char const *word,
     cdict_find_node(dict->data, ptr, word, end, index, &r);
     if (r.found)
       priority_add(q, cdict_freq(dict, r.index), r.index);
-    // Also add suffixes of any length.
-    if (r.prefix_ptr != 0)
-      suffixes(dict, r.prefix_ptr, r.index, q);
     return;
   }
   if (word == end)
+  {
+    if (dist == 1) // Adding a suffixe of any length is a single edit
+      suffixes(dict, ptr, index, q);
     return;
+  }
   int32_t off = PTR_OFFSET(ptr);
   index += PTR_NUMBER(ptr);
   if (PTR_IS_FINAL(ptr))
     index++;
-  // Remove a letter
-  distance(dict, ptr, word + 1, end, index, dist - 1, q);
   switch (PTR_KIND(ptr))
   {
     case BRANCHES:
+      // Remove a letter
+      distance(dict, ptr & ~(PTR_NUMBER_MASK | PTR_FLAG_FINAL), word + 1, end,
+          index, dist - 1, q);
       return distance_branches(dict, off, word, end, index, dist, q);
     case PREFIX:
       return distance_prefix(dict, off, word, end, index, dist, q);

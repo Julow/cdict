@@ -33,7 +33,8 @@ external suffixes : t -> result -> int -> index array = "cdict_suffixes_ocaml"
 external distance : t -> string -> dist:int -> count:int -> index array
   = "cdict_distance_ocaml"
 (** [distance dict word ~dist ~count] lists words that are a [dist] editions
-    away from the [word] according to Levenshtein distance. Do not return words
-    that have a distance less than [dist]. The [count] most frequent words are
-    returned. [suffixes] is called on every words that are found. The returned
-    array cannot contain more than [count] elements but might be smaller. *)
+    away from the [word] according to Levenshtein distance. Adding suffixes of
+    any length is considered to be a single edition. Do not return words that
+    have a distance less than [dist]. The [count] most frequent words are
+    returned. The returned array cannot contain more than [count] elements but
+    might be smaller. *)

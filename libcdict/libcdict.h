@@ -55,8 +55,8 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
 
 /** Lists words that are a [dist] editions away from the [word] according to
     Levenshtein distance. Do not return words that have a distance less than
-    [dist]. The [count] most frequent words are returned. [suffixes] is
-    called on every words that are found. The returned array cannot contain
-    more than [count] elements but might be smaller. */
+    [dist]. The [count] most frequent words are returned. Adding suffixes of
+    any length is considered to be a single edition. The returned array cannot
+    contain more than [count] elements but might be smaller. */
 int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
     int *dst, int count);

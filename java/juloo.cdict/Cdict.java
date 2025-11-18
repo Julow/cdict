@@ -48,10 +48,10 @@ public class Cdict
 
   /** [distance dict word ~dist ~count] lists words that are a specified number
       of edits from the given word according to Levenshtein distance.
-      Suffixes of words at the specified distance are also returned.
-      Do not return words that have a distance less than [dist]. The [count]
-      most frequent words are returned. The returned array cannot contain more
-      than [count] elements but might be smaller. */
+      Adding suffixes of any length is considered to be a single edition. Do
+      not return words that have a distance less than [dist]. The [count] most
+      frequent words are returned. The returned array cannot contain more than
+      [count] elements but might be smaller. */
   public int[] distance(String word, int distance, int count)
   { return distance_native(ptr, word, distance, count); }
 

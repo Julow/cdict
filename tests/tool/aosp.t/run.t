@@ -14,59 +14,59 @@
   prefix: "typename" freq=0 index=7535
   prefix: "typecheck" freq=7 index=7527
   close match: "Type" distance=1 freq=14 index=2115
-  close match: "Type" distance=1 freq=14 index=2115
-  close match: "hyperfine" distance=1 freq=10 index=4549
-  close match: "hyperref" distance=1 freq=14 index=4550
-  close match: "typable" distance=1 freq=0 index=7525
+  close match: "typexpr" distance=1 freq=15 index=7540
+  close match: "typer" distance=1 freq=0 index=7536
+  close match: "type" distance=1 freq=15 index=7526
+  close match: "types" distance=1 freq=15 index=7537
   close match: "style" distance=2 freq=14 index=7108
-  close match: "supertype" distance=2 freq=11 index=7186
-  close match: "pending" distance=2 freq=12 index=5931
-  close match: "pessimization" distance=2 freq=0 index=5960
-  close match: "superscript" distance=2 freq=5 index=7184
+  close match: "mytype" distance=2 freq=9 index=5485
+  close match: "Type" distance=2 freq=14 index=2115
+  close match: "type" distance=2 freq=15 index=7526
+  close match: "Style" distance=2 freq=0 index=1996
   found: "module" freq=15 index=5399
   prefix: "moduleref" freq=5 index=5403
   prefix: "moduleexamples" freq=10 index=5401
   prefix: "modulename" freq=5 index=5402
   prefix: "modulealias" freq=5 index=5400
   prefix: "module" freq=15 index=5399
-  close match: "modular" distance=1 freq=9 index=5398
-  close match: "modulus" distance=1 freq=7 index=5407
-  close match: "Module1" distance=1 freq=7 index=1467
-  close match: "Module" distance=1 freq=14 index=1466
+  close match: "modules" distance=1 freq=15 index=5404
   close match: "moduleexamples" distance=1 freq=10 index=5401
-  close match: "names" distance=2 freq=15 index=5498
-  close match: "name" distance=2 freq=15 index=5496
-  close match: "Module1" distance=2 freq=7 index=1467
+  close match: "mdule" distance=1 freq=11 index=5286
+  close match: "Module" distance=1 freq=14 index=1466
+  close match: "moduleref" distance=1 freq=5 index=5403
+  close match: "middle" distance=2 freq=11 index=5334
+  close match: "mobile" distance=2 freq=0 index=5376
+  close match: "mdule" distance=2 freq=11 index=5286
   close match: "Module" distance=2 freq=14 index=1466
-  close match: "naive" distance=2 freq=9 index=5494
+  close match: "models" distance=2 freq=9 index=5386
   found: "function" freq=15 index=4302
   prefix: "functions" freq=15 index=4306
   prefix: "functional" freq=14 index=4303
   prefix: "function" freq=15 index=4302
   prefix: "functionals" freq=7 index=4305
   prefix: "functionality" freq=5 index=4304
-  close match: "Functional" distance=1 freq=7 index=1064
+  close match: "functionals" distance=1 freq=7 index=4305
+  close match: "functionality" distance=1 freq=5 index=4304
+  close match: "function" distance=1 freq=15 index=4302
   close match: "Function" distance=1 freq=10 index=1063
-  close match: "Functionals" distance=1 freq=0 index=1065
-  close match: "Function" distance=1 freq=10 index=1063
-  close match: "further" distance=2 freq=13 index=4311
-  close match: "functor" distance=2 freq=15 index=4308
-  close match: "Functionals" distance=2 freq=0 index=1065
+  close match: "function\226\128\153s" distance=1 freq=5 index=4307
+  close match: "function" distance=2 freq=15 index=4302
+  close match: "functions" distance=2 freq=15 index=4306
+  close match: "function" distance=2 freq=15 index=4302
   close match: "Function" distance=2 freq=10 index=1063
-  close match: "functors" distance=2 freq=14 index=4309
+  close match: "function" distance=2 freq=15 index=4302
   found: "value" freq=15 index=7722
   prefix: "value" freq=15 index=7722
   prefix: "valuerestriction" freq=0 index=7723
-  close match: "vanilla" distance=1 freq=5 index=7725
-  close match: "vanishes" distance=1 freq=0 index=7726
-  close match: "Value" distance=1 freq=8 index=2185
-  close match: "Value" distance=1 freq=8 index=2185
+  close match: "valuerestriction" distance=1 freq=0 index=7723
   close match: "values" distance=1 freq=15 index=7724
-  close match: "improvement" distance=2 freq=5 index=4630
-  close match: "evaluating" distance=2 freq=8 index=3940
+  close match: "value" distance=1 freq=15 index=7722
+  close match: "Value" distance=1 freq=8 index=2185
+  close match: "glue" distance=2 freq=0 index=4388
+  close match: "valid" distance=2 freq=14 index=7720
   close match: "Value" distance=2 freq=8 index=2185
-  close match: "blue" distance=2 freq=5 index=2756
-  close match: "evaluation" distance=2 freq=14 index=3941
+  close match: "Blue" distance=2 freq=5 index=593
+  close match: "values" distance=2 freq=15 index=7724
   found: "match" freq=15 index=5267
   prefix: "match" freq=15 index=5267
   prefix: "matched" freq=14 index=5268
@@ -78,30 +78,29 @@
   close match: "Batch" distance=1 freq=0 index=566
   close match: "matchings" distance=1 freq=11 index=5271
   close match: "outch" distance=2 freq=10 index=5806
-  close match: "mixed" distance=2 freq=12 index=5363
+  close match: "much" distance=2 freq=13 index=5444
   close match: "batch" distance=2 freq=11 index=2679
   close match: "Batch" distance=2 freq=0 index=566
-  close match: "mix" distance=2 freq=7 index=5362
+  close match: "match" distance=2 freq=15 index=5267
 
   $ cdict-tool query dict overload enum defensive coding
   not found: "overload"
   close match: "overloading" distance=1 freq=0 index=5830
-  close match: "overly" distance=2 freq=5 index=5832
+  close match: "overlap" distance=2 freq=7 index=5827
   close match: "overlook" distance=2 freq=0 index=5831
-  close match: "overrides" distance=2 freq=7 index=5835
+  close match: "overlay" distance=2 freq=0 index=5829
   close match: "overhead" distance=2 freq=9 index=5826
-  close match: "overridden" distance=2 freq=8 index=5833
   not found: "enum"
-  close match: "every" distance=1 freq=13 index=3948
-  close match: "ever" distance=1 freq=8 index=3947
-  close match: "numbers" distance=1 freq=14 index=5629
+  close match: "enumerated" distance=1 freq=10 index=3886
+  close match: "enumerate" distance=1 freq=13 index=3885
+  close match: "vnum" distance=1 freq=12 index=7774
   close match: "num" distance=1 freq=14 index=5623
-  close match: "everything" distance=1 freq=10 index=3949
-  close match: "vy" distance=2 freq=7 index=7785
-  close match: "unambiguously" distance=2 freq=5 index=7568
-  close match: "umask" distance=2 freq=0 index=7563
-  close match: "Jump" distance=2 freq=0 index=1281
-  close match: "unresponsive" distance=2 freq=0 index=7654
+  close match: "enumeration" distance=1 freq=0 index=3887
+  close match: "sum" distance=2 freq=14 index=7171
+  close match: "end" distance=2 freq=15 index=3844
+  close match: "nsm" distance=2 freq=7 index=5619
+  close match: "Num" distance=2 freq=11 index=1553
+  close match: "env" distance=2 freq=13 index=3888
   not found: "defensive"
   not found: "coding"
   close match: "coming" distance=1 freq=5 index=3093
@@ -110,7 +109,7 @@
   close match: "scoping" distance=2 freq=0 index=6721
   close match: "Coding" distance=2 freq=0 index=712
   close match: "owing" distance=2 freq=0 index=5843
-  close match: "hash" distance=2 freq=14 index=4463
+  close match: "going" distance=2 freq=9 index=4394
   [4]
 
 Prefix search:
@@ -122,16 +121,16 @@ Prefix search:
   prefix: "typexr" freq=5 index=7541
   prefix: "typically" freq=14 index=7543
   prefix: "typexpr" freq=15 index=7540
-  close match: "mypoint" distance=1 freq=7 index=5480
-  close match: "myprog" distance=1 freq=13 index=5481
-  close match: "hyperref" distance=1 freq=14 index=4550
-  close match: "hyphen" distance=1 freq=0 index=4551
-  close match: "Types" distance=1 freq=0 index=2116
+  close match: "Typ" distance=1 freq=12 index=2113
+  close match: "tmp" distance=1 freq=10 index=7398
+  close match: "typ" distance=1 freq=15 index=7524
+  close match: "top" distance=1 freq=15 index=7416
+  close match: "typable" distance=1 freq=0 index=7525
   close match: "utop" distance=2 freq=0 index=7711
-  close match: "uppercase" distance=2 freq=13 index=7688
-  close match: "powers" distance=2 freq=0 index=6055
+  close match: "up" distance=2 freq=15 index=7681
+  close match: "pp" distance=2 freq=13 index=6056
   close match: "p" distance=2 freq=15 index=5847
-  close match: "upper" distance=2 freq=11 index=7687
+  close match: "step" distance=2 freq=14 index=7058
 
 Stats:
 
