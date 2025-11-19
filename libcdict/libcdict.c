@@ -19,15 +19,17 @@ cdict_t cdict_of_string(char const *data, int size)
 
 static inline int branches_number(branches_t const *b, int branch_i)
 {
-  switch (b->header & BRANCHES_NUMBERS_FORMAT_MASK)
-  {
-    case NUMBERS_8_BITS:
-      return BRANCHES_NUMBERS(b, uint8_t)[branch_i] * MAX_PTR_NUMBER;
-    case NUMBERS_16_BITS:
-      return BRANCHES_NUMBERS(b, uint16_t)[branch_i] * MAX_PTR_NUMBER;
-    case NUMBERS_NONE:
-    default: return 0;
-  }
+  branches_numbers_format_t format = b->header & BRANCHES_NUMBERS_FORMAT_MASK;
+  uint8_t const *ar = BRANCHES_NUMBERS(b) + branch_i *
+    BRANCHES_NUMBERS_FORMAT_BYTE_LENGTH(format);
+  if (format == NUMBERS_8_BITS)
+    return ar[0] * MAX_PTR_NUMBER;
+  else if (format == NUMBERS_16_BITS)
+    return ((ar[0] << 8) | ar[1]) * MAX_PTR_NUMBER;
+  else if (format == NUMBERS_24_BITS)
+    return ((ar[0] << 16) | (ar[1] << 8) | ar[2]) * MAX_PTR_NUMBER;
+  else
+    return 0;
 }
 
 /** ************************************************************************

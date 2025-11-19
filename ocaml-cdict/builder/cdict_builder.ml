@@ -24,12 +24,11 @@ module Optimized = struct
   module IdMap = Map.Make (Id)
 
   type tr = { number : int; final : bool; next : Id.t }
-  type sized_integer_array = [ `I8 | `I16 ] * int array
 
   type branches = {
     labels : string;  (** Labels encodes a binary tree. *)
     branches : tr array;  (** Same length as [labels]. *)
-    numbers : sized_integer_array option;  (** Same length as [labels]. *)
+    numbers : Sized_int_array.t option;  (** Variable size. *)
   }
 
   type node = Branches of branches | Prefix of string * tr
@@ -58,10 +57,7 @@ module Optimized = struct
             (fun tr -> { tr with number = tr.number mod C.c_MAX_PTR_NUMBER })
             branches
         in
-        let n_size =
-          if Array.exists (fun n -> n > 0xFF) numbers then `I16 else `I8
-        in
-        (branches, Some (n_size, numbers))
+        (branches, Some (Sized_int_array.mk_detect ~signed:false numbers))
       else (branches, None)
     in
     Branches { labels; branches; numbers }
@@ -189,11 +185,13 @@ module Buf = struct
   module Open = struct
     let w_int32 b node_off off i = Bytes.set_int32_le b.b (node_off + off) i
     let w_uint8 b node_off off i = Bytes.set_uint8 b.b (node_off + off) i
-    let w_uint16 b node_off off i = Bytes.set_uint16_le b.b (node_off + off) i
     let w_bzero b node_off off len = Bytes.fill b.b (node_off + off) len '\000'
 
     let w_str b node_off off s =
       Bytes.blit_string s 0 b.b (node_off + off) (String.length s)
+
+    let w_bytes b node_off off s =
+      Bytes.blit s 0 b.b (node_off + off) (Bytes.length s)
   end
 
   include Open
@@ -283,18 +281,23 @@ module Writer = struct
     w_str b off O.prefix_t_prefix p;
     off
 
-  and write_numbers w_number number_byte_size numbers b off =
-    Array.iteri (fun i n -> w_number b off (i * number_byte_size) n) numbers
-
   and write_branches_node seen b nodes { labels; branches; numbers } =
     let length = String.length labels in
     let branch_start_off = align4 (S.branches_t + length) in
     let numbers_start_off = branch_start_off + (length * S.ptr_t) in
-    let number_byte_size, numbers_format, w_numbers =
+    let number_byte_size, numbers_format, numbers_encoded =
       match numbers with
-      | Some (`I8, n) -> (1, C.c_NUMBERS_8_BITS, write_numbers w_uint8 1 n)
-      | Some (`I16, n) -> (2, C.c_NUMBERS_16_BITS, write_numbers w_uint16 2 n)
-      | None -> (0, C.c_NUMBERS_NONE, fun _ _ -> ())
+      | Some (format, ar) ->
+          let s, f =
+            match format with
+            | U8 -> (1, C.c_NUMBERS_8_BITS)
+            | U16 -> (2, C.c_NUMBERS_16_BITS)
+            | U24 -> (3, C.c_NUMBERS_24_BITS)
+            | _ -> assert false
+          in
+          assert (Bytes.length ar = length * s);
+          (s, f, ar)
+      | None -> (0, C.c_NUMBERS_NONE, Bytes.empty)
     in
     let off = alloc b (numbers_start_off + (length * number_byte_size)) in
     let branch_off i = branch_start_off + (i * S.ptr_t) in
@@ -307,7 +310,7 @@ module Writer = struct
     Array.iteri
       (fun i n -> Ptr.w b off (branch_off i) (write_node seen b nodes n))
       branches;
-    w_numbers b (off + numbers_start_off);
+    w_bytes b off numbers_start_off numbers_encoded;
     off
 
   let write_tree b ((nodes, root_id), freq) =
@@ -373,15 +376,14 @@ let stats ppf ((tree, _root_id), freq) =
     List.filter_map (function Branches b -> Some b | _ -> None) nodes
   in
   Format.fprintf ppf
-    "@[<v 2>Branch nodes: %d@ With size:@ %a@ %a@ With numbers: %a@]@\n"
+    "@[<v 2>Branch nodes: %d@ With size:@ %a@ %a@ With numbers format: %a@]@\n"
     (List.length branches)
     (hist_int (fun b -> String.length b.labels))
     branches pp_transitions
     (List.concat_map (fun b -> Array.to_list b.branches) branches)
     (hist_str (fun b ->
          match b.numbers with
-         | Some (`I8, _) -> "8 bits"
-         | Some (`I16, _) -> "16 bits"
+         | Some (f, _) -> Sized_int_array.format_to_string f
          | None -> "None"))
     branches;
   let prefixes =
@@ -424,3 +426,4 @@ let pp ppf ((nodes, root_id), freq) = pp freq nodes 0 ppf root_id
 
 module Complete_tree = Complete_tree
 module K_medians = K_medians
+module Sized_int_array = Sized_int_array

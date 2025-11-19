@@ -37,3 +37,5 @@ module K_medians : sig
     renumber:('a -> int -> 'b) ->
     'b array
 end
+
+module Sized_int_array : module type of Sized_int_array

@@ -76,7 +76,7 @@ typedef struct
     ((sizeof(branches_t) + (B)->length + 3) & -4)))
 
 /** Pointer to the 'numbers' array. Format depends on the 'header'. */
-#define BRANCHES_NUMBERS(B, TYP) ((TYP const *)(((void const*)(B)) + \
+#define BRANCHES_NUMBERS(B) ((uint8_t const *)(((void const*)(B)) + \
       ((sizeof(branches_t) + (B)->length * (1 + sizeof(ptr_t)) + 3) & -4)))
 
 /** Format of the 'numbers' array.
@@ -87,9 +87,11 @@ typedef enum
   NUMBERS_NONE = 0,
   NUMBERS_8_BITS = 1,
   NUMBERS_16_BITS = 2,
+  NUMBERS_24_BITS = 3,
 } branches_numbers_format_t;
 
 #define BRANCHES_NUMBERS_FORMAT_MASK 0b11
+#define BRANCHES_NUMBERS_FORMAT_BYTE_LENGTH(F) ((int)(F))
 
 /** PREFIX nodes (size = 8 bytes)
 

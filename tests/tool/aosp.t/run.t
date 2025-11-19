@@ -148,7 +148,7 @@ Stats:
     Transitions: 7597
       | Final: 2081 | Non-final: 5516 |
       With numbers length in bytes: |  1: 7597 |
-    With numbers: | 8 bits: 13   | None: 2249 |
+    With numbers format: | None: 2249 | U8: 13   |
   Prefix nodes: 2523
     Followed by:
     | Branches: 2116 | Prefix: 407  |
