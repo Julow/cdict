@@ -28,7 +28,7 @@ typedef struct
   int index;
   /** Unique index of the recognized word or [-1] if the query is not
       recognized. Find the corresponding freq at [dict->freq[index]]. */
-  uint32_t prefix_ptr;
+  intptr_t prefix_ptr;
   /** Internal node where the search stopped. Use [cdict_suffixes] to list
       the words starting with this prefix. Might be [0], in which case the
       queried is not the prefix of any word in the dictionary. */

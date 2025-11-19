@@ -11,10 +11,11 @@ public class Cdict
       to lookup word metadata. */
     public final int index;
     /** Internal pointer used by the suffixes function. */
-    public final int prefix_ptr;
+    public final long prefix_ptr;
 
     // Constructed from C code.
-    private Result() { found = false; index = -1; prefix_ptr = 0; }
+    private Result()
+    { found = false; index = -1; prefix_ptr = 0; }
   }
 
   /** Load a dictionary stored in a string. The data is copied and not modified.

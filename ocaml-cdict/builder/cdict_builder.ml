@@ -202,28 +202,31 @@ end
 type kind = [ `Prefix | `Branches ]
 
 module Ptr : sig
-  type t = private int32
+  type t
 
   val v : final:bool -> number:int -> kind -> int -> t
+  val encode : node_off:int -> t -> int32
   val w : Buf.t -> int -> int -> t -> unit
 end = struct
-  type t = int32
+  type t = { final : bool; number : int; kind : kind; offset : int }
 
   let tag_of_kind = function
     | `Prefix -> C.tag_PREFIX
     | `Branches -> C.tag_BRANCHES
 
-  let v ~final ~number kind offset =
+  let v ~final ~number kind offset = { final; number; kind; offset }
+
+  let encode ~node_off { final; number; kind; offset } =
     let open Int32 in
     let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
     assert (number land lnot C.c_MAX_PTR_NUMBER = 0);
     let number = shift_left (of_int number) C.c_PTR_NUMBER_OFFSET in
-    let offset = of_int offset in
-    assert (logand number (lognot C.mask_PTR_NUMBER_MASK) = 0l);
-    assert (logand offset (lognot C.mask_PTR_OFFSET_MASK) = 0l);
+    (* Offsets are relative *)
+    let offset = offset - node_off in
+    let offset = shift_left (of_int offset) C.c_PTR_OFFSET_OFFSET in
     logor number (logor final_flag (logor (tag_of_kind kind) offset))
 
-  let w b node_off off ptr = Buf.w_int32 b node_off off ptr
+  let w b node_off off ptr = Buf.w_int32 b node_off off (encode ~node_off ptr)
 end
 
 module Writer = struct
@@ -270,7 +273,8 @@ module Writer = struct
   and write_prefix_node seen b nodes p next =
     let len = String.length p in
     let off = alloc b (S.prefix_t + len) in
-    let next_ptr :> int32 = write_node seen b nodes next in
+    let next_ptr = write_node seen b nodes next in
+    let next_ptr = Ptr.encode ~node_off:off next_ptr in
     assert (Int32.logand next_ptr C.mask_PTR_NUMBER_MASK = 0l);
     let next_ptr =
       Int32.(logor next_ptr (shift_left (of_int len) C.c_PTR_NUMBER_OFFSET))

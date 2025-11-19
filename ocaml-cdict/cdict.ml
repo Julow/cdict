@@ -1,14 +1,14 @@
 type t
 type index = private int
-
+type node
 type ptr
-(** Internal pointer in the dictionary. *)
 
 type result = {
   found : bool;  (** Whether the word is recognized. *)
   index : index;
       (** Unique index of the word, can be used to lookup word metadata. *)
-  prefix_ptr : ptr;
+  prefix_node : node;
+  prefix_node_ptr : ptr;
       (** Internal pointer used to list words starting with a prefix. *)
 }
 

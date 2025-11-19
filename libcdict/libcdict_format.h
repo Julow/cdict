@@ -7,44 +7,48 @@ The main concepts are nodes and tagged pointers.
 Nodes form the data structure and a tagged pointers reference a node.
 There are several kinds of nodes.
 
-Tagged pointers (ptr_t) are 32 bits integers with the following layout:
-- The 29 highest bits represent the byte offset in the dictionary where the
-  referenced node starts.
-- The 3 lowest bits represent the kind of the referenced node.
+Tagged pointers (ptr_t) are 32 bits integers with the following fields:
+- offset: Signed integer representing the relative offset to the next node.
+  The offset is relative to the start of the parent node.
+- number: Used to increment the "index" value during traversal.
+- kind: Kind of the next node.
+- final: Flag final transition.
 
-The offset in the dictionary is obtained from a tagged pointers using
-PTR_OFFSET(PTR).
-NULL pointers (int32 equal to 0) are recognized as a pointer to a branches node
-at offset 0, unless it is given an other meaning in specific contextes (field
-of type ptr_or_null_t).
+NULL pointers are not allowed unless specified.
 */
 
 #include <stdint.h>
 
-typedef uint32_t ptr_t;
-typedef ptr_t ptr_or_null_t;
+typedef int32_t ptr_t;
 
 typedef enum
 {
-  BRANCHES = 0b000,
-  PREFIX = 0b001,
+  BRANCHES = 0b0,
+  PREFIX = 0b1,
 } kind_t;
 
 /** Whether the pointer is a final transition. */
-#define PTR_FLAG_FINAL 0b10u
+#define PTR_FLAG_FINAL 0b10
 
+// Number field (8 bits unsigned integer)
 #define MAX_PTR_NUMBER 0xFFu
-#define PTR_NUMBER_OFFSET 24
+#define PTR_NUMBER_OFFSET 3
+#define PTR_NUMBER_MASK (MAX_PTR_NUMBER << PTR_NUMBER_OFFSET)
 
+#define PTR_NUMBER(PTR) ((int)(((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET))
+
+// Kind and flags (2 bits)
 #define PTR_KIND_MASK 0b1u
 #define PTR_FLAGS_MASK PTR_FLAG_FINAL
-#define PTR_NUMBER_MASK (MAX_PTR_NUMBER << PTR_NUMBER_OFFSET)
-#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
 
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
-#define PTR_NUMBER(PTR) (int)(((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET)
-#define PTR_OFFSET(PTR) ((PTR) & PTR_OFFSET_MASK)
 #define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
+
+// Offset field (21 bits signed integer)
+#define PTR_OFFSET_OFFSET 11
+#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
+
+#define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + ((PTR) >> PTR_OFFSET_OFFSET))
 
 /** BRANCHES nodes (size = 4 bytes + array)
 
@@ -99,12 +103,25 @@ The length cannot be 0.
 
 typedef struct
 {
-  uint32_t next_ptr_and_len;
+  int32_t next_ptr_and_len;
   char prefix[];
 } prefix_t;
 
 #define PREFIX_NEXT_PTR(P) ((P)->next_ptr_and_len & ~PTR_NUMBER_MASK)
 #define PREFIX_LENGTH(P) PTR_NUMBER((P)->next_ptr_and_len)
+
+/** Prefix pointer
+
+This is a pointer to a node, with the node kind embedded.
+It is exposed in 'cdict_result_t' but not used outside of the library.
+
+'prefix_ptr' can be NULL.
+*/
+
+#define PREFIX_PTR_NODE(P) ((void const*)((P) & ~(intptr_t)PTR_KIND_MASK))
+#define PREFIX_PTR_PTR(P) ((kind_t)((P) & PTR_KIND_MASK))
+
+#define PREFIX_PTR(NODE, PTR) (((intptr_t)(NODE)) | ((PTR) & PTR_KIND_MASK))
 
 /** Dictionary header (size = 8 bytes)
 

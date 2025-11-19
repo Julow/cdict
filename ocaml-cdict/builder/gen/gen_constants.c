@@ -28,6 +28,7 @@ int main()
 
   VAL(c_, MAX_PTR_NUMBER);
   VAL(c_, PTR_NUMBER_OFFSET);
+  VAL(c_, PTR_OFFSET_OFFSET);
   VAL(c_, NUMBERS_NONE);
   VAL(c_, NUMBERS_8_BITS);
   VAL(c_, NUMBERS_16_BITS);

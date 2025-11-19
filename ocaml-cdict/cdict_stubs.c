@@ -25,7 +25,7 @@ static value alloc_result(cdict_result_t const *r)
   v = caml_alloc_tuple(3);
   Store_field(v, 0, Val_bool(r->found));
   Store_field(v, 1, Val_int(r->index));
-  Store_field(v, 2, Val_int(r->prefix_ptr));
+  Store_field(v, 2, caml_copy_nativeint(r->prefix_ptr));
   CAMLreturn(v);
 }
 
@@ -34,7 +34,7 @@ static void result_of_value(value v, cdict_result_t *dst)
 {
   dst->found = Bool_val(Field(v, 0));
   dst->index = Int_val(Field(v, 1));
-  dst->prefix_ptr = Int_val(Field(v, 2));
+  dst->prefix_ptr = Nativeint_val(Field(v, 2));
 }
 
 value cdict_of_string_ocaml(value str)
