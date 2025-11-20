@@ -26,3 +26,10 @@ val set : t -> int -> int -> unit
     is truncated if it doesn't fit the array's format. *)
 
 val format_to_string : format -> string
+
+(** Functions for working with big-endian 24-bits integers in bytes. *)
+
+val set_int24_be : bytes -> int -> int -> unit
+val set_uint24_be : bytes -> int -> int -> unit
+val get_int24_be : bytes -> int -> int
+val get_uint24_be : bytes -> int -> int

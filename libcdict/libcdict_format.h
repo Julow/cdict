@@ -105,12 +105,12 @@ The length cannot be 0.
 
 typedef struct
 {
-  int32_t next_ptr_and_len;
+  uint8_t next_ptr[3]; /** 24-bits big-endian integer. */
+  uint8_t length;
   char prefix[];
 } prefix_t;
 
-#define PREFIX_NEXT_PTR(P) ((P)->next_ptr_and_len & ~PTR_NUMBER_MASK)
-#define PREFIX_LENGTH(P) PTR_NUMBER((P)->next_ptr_and_len)
+#define PREFIX_MAX_LENGTH 0xFF
 
 /** Prefix pointer
 

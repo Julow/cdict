@@ -68,7 +68,7 @@ module Optimized = struct
   let rec fold_prefix dfa prefix next final =
     (* The maximum prefix length is [C.c_MAX_PTR_NUMBER] because it is encoded
        in the number field. *)
-    if final || String.length prefix >= C.c_MAX_PTR_NUMBER then
+    if final || String.length prefix >= C.c_PREFIX_MAX_LENGTH then
       (prefix, next, final)
     else
       match state dfa next with
@@ -185,6 +185,10 @@ module Buf = struct
   module Open = struct
     let w_int32 b node_off off i = Bytes.set_int32_le b.b (node_off + off) i
     let w_uint8 b node_off off i = Bytes.set_uint8 b.b (node_off + off) i
+
+    let w_int24 b node_off off i =
+      Sized_int_array.set_int24_be b.b (node_off + off) i
+
     let w_bzero b node_off off len = Bytes.fill b.b (node_off + off) len '\000'
 
     let w_str b node_off off s =
@@ -275,9 +279,13 @@ module Writer = struct
     let next_ptr = Ptr.encode ~node_off:off next_ptr in
     assert (Int32.logand next_ptr C.mask_PTR_NUMBER_MASK = 0l);
     let next_ptr =
-      Int32.(logor next_ptr (shift_left (of_int len) C.c_PTR_NUMBER_OFFSET))
+      Int32.(
+        logor
+          (logand (shift_right next_ptr 9) (lognot 0b11l))
+          (logand next_ptr 0b11l))
     in
-    w_int32 b off O.prefix_t_next_ptr_and_len next_ptr;
+    w_int24 b off O.prefix_t_next_ptr (Int32.to_int next_ptr);
+    w_uint8 b off O.prefix_t_length len;
     w_str b off O.prefix_t_prefix p;
     off
 

@@ -33,6 +33,7 @@ int main()
   VAL(c_, NUMBERS_8_BITS);
   VAL(c_, NUMBERS_16_BITS);
   VAL(c_, NUMBERS_24_BITS);
+  VAL(c_, PREFIX_MAX_LENGTH);
   VAL_INT32(mask_, PTR_KIND_MASK);
   VAL_INT32(mask_, PTR_FLAGS_MASK);
   VAL_INT32(mask_, PTR_OFFSET_MASK);
@@ -48,7 +49,8 @@ int main()
   FIELD(branches_t, header);
   FIELD(branches_t, length);
   FIELD(branches_t, labels);
-  FIELD(prefix_t, next_ptr_and_len);
+  FIELD(prefix_t, next_ptr);
+  FIELD(prefix_t, length);
   FIELD(prefix_t, prefix);
   FIELD(header_t, root_ptr);
   FIELD(header_t, freq_off);

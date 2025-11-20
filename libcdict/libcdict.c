@@ -17,6 +17,22 @@ cdict_t cdict_of_string(char const *data, int size)
   return dict;
 }
 
+static inline int decode_int24(uint8_t const *ar)
+{
+  return (((int)(int8_t)ar[0]) << 16) | (ar[1] << 8) | ar[2];
+}
+
+static inline int decode_uint24(uint8_t const *ar)
+{
+  return (ar[0] << 16) | (ar[1] << 8) | ar[2];
+}
+
+static inline int decode_prefix_next_ptr(prefix_t const *p)
+{
+  int ptr = decode_int24(p->next_ptr);
+  return ((ptr & ~0b11) << 9) | (ptr & 0b11);
+}
+
 static inline int branches_number(branches_t const *b, int branch_i)
 {
   branches_numbers_format_t format = b->header & BRANCHES_NUMBERS_FORMAT_MASK;
@@ -27,7 +43,7 @@ static inline int branches_number(branches_t const *b, int branch_i)
   else if (format == NUMBERS_16_BITS)
     return ((ar[0] << 8) | ar[1]) * MAX_PTR_NUMBER;
   else if (format == NUMBERS_24_BITS)
-    return ((ar[0] << 16) | (ar[1] << 8) | ar[2]) * MAX_PTR_NUMBER;
+    return decode_uint24(ar) * MAX_PTR_NUMBER;
   else
     return 0;
 }
@@ -66,14 +82,14 @@ static void cdict_find_prefix(prefix_t const *node,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
   char const *prefix = node->prefix;
-  char const *prefix_end = prefix + PREFIX_LENGTH(node);
+  char const *prefix_end = prefix + node->length;
   while (true)
   {
     if (*(word++) != *(prefix++)) return; // Prefix doesn't match
     if (prefix == prefix_end) break; // Prefix matches
     if (word == end) return; // Query ends
   }
-  cdict_find_node(node, PREFIX_NEXT_PTR(node), word, end, index, result);
+  cdict_find_node(node, decode_prefix_next_ptr(node), word, end, index, result);
 }
 
 static void cdict_find_node(void const *parent_node, ptr_t ptr,
@@ -158,13 +174,13 @@ static int cdict_word_branches(branches_t const *b, int index,
 static int cdict_word_prefix(prefix_t const *p, int index,
     char *dst, int dsti, int max_len)
 {
-  int end = dsti + PREFIX_LENGTH(p);
+  int end = dsti + p->length;
   char const *prefix = p->prefix;
   if (end > max_len)
     end = max_len;
   while (dsti < end)
     dst[dsti++] = *(prefix++);
-  return cdict_word_node(p, PREFIX_NEXT_PTR(p), index, dst, end, max_len);
+  return cdict_word_node(p, decode_prefix_next_ptr(p), index, dst, end, max_len);
 }
 
 static int cdict_word_node(void const *parent_node, ptr_t ptr, int index,
@@ -274,7 +290,8 @@ static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
       suffixes_branches(dict, node, index, dst);
       break;
     case PREFIX:
-      suffixes(dict, node, PREFIX_NEXT_PTR((prefix_t const*)node), index, dst);
+      suffixes(dict, node, decode_prefix_next_ptr((prefix_t const*)node),
+          index, dst);
       break;
   }
 }
@@ -355,21 +372,21 @@ static int levenshtein_distance(char const *a, int a_length,
 static void distance_prefix(cdict_t const *dict, prefix_t const *p,
     char const *word, char const *end, int index, int dist, priority_t *q)
 {
-  int len = PREFIX_LENGTH(p);
+  int len = p->length;
   int word_len = ((intptr_t)end) - ((intptr_t)word);
   int common_len = min(word_len, len);
   int pdist = levenshtein_distance(word, common_len, p->prefix, common_len);
   if (word_len < len)
   {
     if (pdist + 1 == dist)
-      suffixes(dict, p, PREFIX_NEXT_PTR(p), index, q);
+      suffixes(dict, p, decode_prefix_next_ptr(p), index, q);
     return;
   }
   int next_dist = dist - pdist;
   for (int i = len; i >= 0 && next_dist >= 0; i--)
   {
     // Add suffixes of 'p', including the empty suffix.
-    distance(dict, p, PREFIX_NEXT_PTR(p), word + i, end, index, next_dist, q);
+    distance(dict, p, decode_prefix_next_ptr(p), word + i, end, index, next_dist, q);
     next_dist--;
   }
 }
