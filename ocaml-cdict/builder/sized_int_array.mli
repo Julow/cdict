@@ -26,6 +26,7 @@ val set : t -> int -> int -> unit
     is truncated if it doesn't fit the array's format. *)
 
 val format_to_string : format -> string
+val detect_format : ?signed:bool -> int array -> format
 
 (** Functions for working with big-endian 24-bits integers in bytes. *)
 

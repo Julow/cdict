@@ -1,25 +1,9 @@
 /** libdict
 
 This file describes the encoding of the dictionary.
-
-The main concepts are nodes and tagged pointers.
-
-Nodes form the data structure and a tagged pointers reference a node.
-There are several kinds of nodes.
-
-Tagged pointers (ptr_t) are 32 bits integers with the following fields:
-- offset: Signed integer representing the relative offset to the next node.
-  The offset is relative to the start of the parent node.
-- number: Used to increment the "index" value during traversal.
-- kind: Kind of the next node.
-- final: Flag final transition.
-
-NULL pointers are not allowed unless specified.
 */
 
 #include <stdint.h>
-
-typedef int32_t ptr_t;
 
 typedef enum
 {
@@ -42,47 +26,87 @@ typedef enum
 
 #define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + (int)((PTR) & PTR_OFFSET_MASK))
 
+/** Sized integer arrays. */
+
+/** Format of integer arrays. All formats are big-endians. This is also the
+    size in bytes of each element. */
+typedef enum
+{
+  FORMAT_8_BITS = 1,
+  FORMAT_16_BITS = 2,
+  FORMAT_24_BITS = 3,
+} format_t;
+
+/** Mask masking every values of [format_t]. */
+#define MAX_FORMAT_T 0b11
+
+/** Access the [i]th unsigned integer in array [ar] of format [fmt]. */
+static inline int sized_int_array_unsigned(uint8_t const *ar, format_t fmt, int i)
+{
+  if (fmt == FORMAT_8_BITS)
+    return ar[i];
+  ar = ar + fmt * i;
+  if (fmt == FORMAT_16_BITS)
+    return ((ar[0] << 8) | ar[1]);
+  return (int)(unsigned)((ar[0] << 16) | (ar[1] << 8) | ar[2]);
+}
+
+/** Access the [i]th unsigned integer in array [ar] of format [fmt]. */
+static inline int sized_int_array_signed(uint8_t const *ar, format_t fmt, int i)
+{
+  if (fmt == FORMAT_8_BITS)
+    return (int)(int8_t)ar[i];
+  ar = ar + fmt * i;
+  if (fmt == FORMAT_16_BITS)
+    return (((int)((int8_t)ar[0]) << 8) | ar[1]);
+  return (int)(((int8_t)ar[0] << 16) | (ar[1] << 8) | ar[2]);
+}
+
 /** BRANCHES nodes (size = 4 bytes + array)
 
 A branching node that consumes 1 byte from the query. The branch labels are
 stored in a binary search tree.
 First search for the current byte prefix into 'labels' then lookup the
-corresponding pointer in 'branches'.
+corresponding pointer in 'branches' and number in 'numbers'
+
+Branches are not NULL and there is no padding within the node.
 */
 
 typedef struct
 {
   uint8_t header;
-  /** Encode the format of the 'numbers' array. */
+  /** Encode the format of the 'branches' and 'numbers' array. */
   uint8_t length;
   /** Length of the 'labels' and 'branches' arrays. Not the offset to the
       'branches' array. */
   char labels[];
-  // ptr_t branches[]; /** Use [BRANCHES(b)] to access. */
-  // char numbers[]; /** Use [NUMBERS(b)] to access. */
+  // uint8_t branches[]; /** Use [branch(b, i)] to access. */
+  // uint8_t numbers[]; /** Use [branch_number(b, i)] to access. */
 } branches_t;
 
-/** Pointer to the 'branches' array. */
-#define BRANCHES(B) ((ptr_t const*)(((void const*)(B)) + \
-    ((sizeof(branches_t) + (B)->length + 3) & -4)))
+#define BRANCHES_BRANCHES_FORMAT_OFFSET 2
+#define BRANCHES_NUMBERS_FORMAT_OFFSET 0
 
-/** Pointer to the 'numbers' array. Format depends on the 'header'. */
-#define BRANCHES_NUMBERS(B) ((uint8_t const *)(((void const*)(B)) + \
-      ((sizeof(branches_t) + (B)->length * (1 + sizeof(ptr_t)) + 3) & -4)))
+#define BRANCHES_BRANCHES_FORMAT(B) \
+  ((format_t)(((B)->header >> BRANCHES_BRANCHES_FORMAT_OFFSET) & MAX_FORMAT_T))
 
-/** Format of the 'numbers' array.
-    The numbers array is accessed using [BRANCHES_NUMBERS(B)] and the size of
-    the elements depend on the format. */
-typedef enum
+#define BRANCHES_NUMBERS_FORMAT(B) \
+  ((format_t)(((B)->header >> BRANCHES_NUMBERS_FORMAT_OFFSET) & MAX_FORMAT_T))
+
+/** Access a branch. */
+static inline int branch(branches_t const *b, int i)
 {
-  NUMBERS_NONE = 0,
-  NUMBERS_8_BITS = 1,
-  NUMBERS_16_BITS = 2,
-  NUMBERS_24_BITS = 3,
-} branches_numbers_format_t;
+  uint8_t const *ar = ((void const*)b) + (sizeof(branches_t) + b->length);
+  return sized_int_array_signed(ar, BRANCHES_BRANCHES_FORMAT(b), i);
+}
 
-#define BRANCHES_NUMBERS_FORMAT_MASK 0b11
-#define BRANCHES_NUMBERS_FORMAT_BYTE_LENGTH(F) ((int)(F))
+/** Access a number. */
+static inline unsigned int branch_number(branches_t const *b, int i)
+{
+  uint8_t const *ar = ((void const*)b) +
+    (sizeof(branches_t) + b->length * (BRANCHES_BRANCHES_FORMAT(b) + 1));
+  return sized_int_array_unsigned(ar, BRANCHES_NUMBERS_FORMAT(b), i);
+}
 
 /** PREFIX nodes (size = 8 bytes)
 

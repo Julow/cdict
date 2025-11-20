@@ -47,18 +47,18 @@ let rec min_and_max min_ max_ ar i =
     let n = ar.(i) in
     min_and_max (Int.min n min_) (Int.max n max_) ar (i + 1)
 
-let detect_format force_signed ar =
-  if Array.length ar = 0 then U8
+let detect_format ?signed ar =
+  if Array.length ar = 0 then match signed with Some true -> I8 | _ -> U8
   else
     let first = ar.(0) in
     let min, max_ = min_and_max first first ar 1 in
-    let signed = match force_signed with Some s -> s | None -> min < 0 in
+    let signed = match signed with Some s -> s | None -> min < 0 in
     (* [+ 1] so that [-128] because [127] as they both fit on one byte. *)
     let min_abs = if min < 0 then ~-min - 1 else min in
     let max_abs = Int.max min_abs max_ in
     format_of_integer max_abs signed
 
-let mk_detect ?signed ar = mk (detect_format signed ar) ar
+let mk_detect ?signed ar = mk (detect_format ?signed ar) ar
 
 let get (format, b) i =
   let get, _set, i_size = format_specs format in

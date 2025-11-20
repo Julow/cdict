@@ -28,7 +28,7 @@ module Optimized = struct
   type branches = {
     labels : string;  (** Labels encodes a binary tree. *)
     branches : tr array;  (** Same length as [labels]. *)
-    numbers : Sized_int_array.t;  (** Variable size. *)
+    numbers : int array;  (** Same length as [labels]. *)
   }
 
   type node = Branches of branches | Prefix of string * tr
@@ -48,7 +48,6 @@ module Optimized = struct
     let labels = String.init length (fun i -> fst tree.(i)) in
     let branches = Array.map (fun (_, (_, tr)) -> tr) tree in
     let numbers = Array.map (fun (_, (n, _)) -> n) tree in
-    let numbers = Sized_int_array.mk_detect ~signed:false numbers in
     Branches { labels; branches; numbers }
 
   module Seen = Dfa.Id.Map
@@ -178,7 +177,7 @@ module Buf = struct
     let w_int24 b node_off off i =
       Sized_int_array.set_int24_be b.b (node_off + off) i
 
-    let w_bzero b node_off off len = Bytes.fill b.b (node_off + off) len '\000'
+    (* let w_bzero b node_off off len = Bytes.fill b.b (node_off + off) len '\000' *)
 
     let w_str b node_off off s =
       Bytes.blit_string s 0 b.b (node_off + off) (String.length s)
@@ -196,26 +195,22 @@ module Ptr : sig
   type t
 
   val v : final:bool -> kind -> int -> t
-  val encode : node_off:int -> t -> int32
-  val w : Buf.t -> int -> int -> t -> unit
+  val encode : node_off:int -> t -> int
 end = struct
-  type t = { final : bool; kind : kind; offset : int }
+  type t = { final : bool; kind : kind; address : int }
 
   let tag_of_kind = function
     | `Prefix -> C.tag_PREFIX
     | `Branches -> C.tag_BRANCHES
 
-  let v ~final kind offset = { final; kind; offset }
+  let v ~final kind address = { final; kind; address }
 
-  let encode ~node_off { final; kind; offset } =
-    let open Int32 in
-    let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
+  let encode ~node_off { final; kind; address } =
+    let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0 in
     (* Offsets are relative *)
-    let offset = of_int (offset - node_off) in
-    assert (logand offset C.mask_PTR_OFFSET_MASK = offset);
-    logor final_flag (logor (tag_of_kind kind) offset)
-
-  let w b node_off off ptr = Buf.w_int32 b node_off off (encode ~node_off ptr)
+    let offset = address - node_off in
+    assert (offset land C.mask_PTR_OFFSET_MASK = offset);
+    final_flag lor tag_of_kind kind lor offset
 end
 
 module Writer = struct
@@ -261,38 +256,46 @@ module Writer = struct
     let off = alloc b (S.prefix_t + len) in
     let next_ptr = write_node seen b nodes next in
     let next_ptr = Ptr.encode ~node_off:off next_ptr in
-    w_int24 b off O.prefix_t_next_ptr (Int32.to_int next_ptr);
+    w_int24 b off O.prefix_t_next_ptr next_ptr;
     w_uint8 b off O.prefix_t_length len;
     w_str b off O.prefix_t_prefix p;
     off
 
   and write_branches_node seen b nodes { labels; branches; numbers } =
+    (* Write all the children nodes before, to compress the 'branches' array
+        according to the needs. *)
+    let branches = Array.map (fun tr -> write_node seen b nodes tr) branches in
+    let off = alloc b 0 in
+    let branches = Array.map (Ptr.encode ~node_off:off) branches in
     let length = String.length labels in
-    let branch_start_off = align4 (S.branches_t + length) in
-    let numbers_start_off = branch_start_off + (length * S.ptr_t) in
-    let number_byte_size, numbers_format, numbers_encoded =
-      let format, ar = numbers in
-      let s, f =
-        match format with
-        | U8 -> (1, C.c_NUMBERS_8_BITS)
-        | U16 -> (2, C.c_NUMBERS_16_BITS)
-        | U24 -> (3, C.c_NUMBERS_24_BITS)
-        | _ -> assert false
-      in
-      assert (Bytes.length ar = length * s);
-      (s, f, ar)
+    let branches_start_off = S.branches_t + length in
+    let branch_byte_size, branches_format, branches_encoded =
+      let format, ar = Sized_int_array.mk_detect ~signed:true branches in
+      match format with
+      | I8 -> (1, C.c_FORMAT_8_BITS, ar)
+      | I16 -> (2, C.c_FORMAT_16_BITS, ar)
+      | I24 -> (3, C.c_FORMAT_24_BITS, ar)
+      | _ -> assert false
     in
-    let off = alloc b (numbers_start_off + (length * number_byte_size)) in
-    let branch_off i = branch_start_off + (i * S.ptr_t) in
-    let header = numbers_format in
-    (* Ensure the padding is zero'd *)
-    w_bzero b off 0 branch_start_off;
+    let numbers_start_off = branches_start_off + (length * branch_byte_size) in
+    let number_byte_size, numbers_format, numbers_encoded =
+      let format, ar = Sized_int_array.mk_detect ~signed:false numbers in
+      match format with
+      | U8 -> (1, C.c_FORMAT_8_BITS, ar)
+      | U16 -> (2, C.c_FORMAT_16_BITS, ar)
+      | U24 -> (3, C.c_FORMAT_24_BITS, ar)
+      | _ -> assert false
+    in
+    let header =
+      (branches_format lsl C.c_BRANCHES_BRANCHES_FORMAT_OFFSET)
+      lor (numbers_format lsl C.c_BRANCHES_NUMBERS_FORMAT_OFFSET)
+    in
+    let off' = alloc b (numbers_start_off + (length * number_byte_size)) in
+    assert (off = off');
     w_uint8 b off O.branches_t_header header;
     w_uint8 b off O.branches_t_length length;
     w_str b off O.branches_t_labels labels;
-    Array.iteri
-      (fun i n -> Ptr.w b off (branch_off i) (write_node seen b nodes n))
-      branches;
+    w_bytes b off branches_start_off branches_encoded;
     w_bytes b off numbers_start_off numbers_encoded;
     off
 
@@ -302,8 +305,11 @@ module Writer = struct
     assert (header_off = 0);
     let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
-    Ptr.w b header_off O.header_t_root_ptr root_ptr;
+    let root_ptr = Ptr.encode ~node_off:0 root_ptr in
+    (* TODO: Integer with unspecified endianness *)
+    w_int32 b header_off O.header_t_root_ptr (Int32.of_int root_ptr);
     let freq_off = alloc b (Freq.size freq) in
+    (* TODO: Integer with unspecified endianness *)
     w_int32 b header_off O.header_t_freq_off (Int32.of_int freq_off);
     w_str b freq_off 0 (freq :> string)
 end
@@ -358,7 +364,8 @@ let stats ppf ((tree, _root_id), freq) =
     (hist_int (fun b -> String.length b.labels))
     branches pp_transitions
     (List.concat_map (fun b -> Array.to_list b.branches) branches)
-    (hist_str (fun b -> Sized_int_array.format_to_string (fst b.numbers)))
+    (hist_str (fun b ->
+         Sized_int_array.(format_to_string (detect_format b.numbers))))
     branches;
   let prefixes =
     List.filter_map
@@ -385,7 +392,7 @@ let rec pp freq nodes index ppf id =
   | Branches { labels; branches; numbers } ->
       fpf "@[<v 2>Branches@ ";
       for i = 0 to Array.length branches - 1 do
-        let n = Sized_int_array.get numbers i in
+        let n = numbers.(i) in
         fpf "%c %a@ " labels.[i] (pp_tr freq nodes (index + n)) branches.(i)
       done;
       fpf "@]"

@@ -22,26 +22,6 @@ static inline int decode_int24(uint8_t const *ar)
   return (((int)(int8_t)ar[0]) << 16) | (ar[1] << 8) | ar[2];
 }
 
-static inline int decode_uint24(uint8_t const *ar)
-{
-  return (int)(unsigned)((ar[0] << 16) | (ar[1] << 8) | ar[2]);
-}
-
-static inline int branches_number(branches_t const *b, int branch_i)
-{
-  branches_numbers_format_t format = b->header & BRANCHES_NUMBERS_FORMAT_MASK;
-  uint8_t const *ar = BRANCHES_NUMBERS(b) + branch_i *
-    BRANCHES_NUMBERS_FORMAT_BYTE_LENGTH(format);
-  if (format == NUMBERS_8_BITS)
-    return ar[0];
-  else if (format == NUMBERS_16_BITS)
-    return ((ar[0] << 8) | ar[1]);
-  else if (format == NUMBERS_24_BITS)
-    return decode_uint24(ar);
-  else
-    return 0;
-}
-
 /** ************************************************************************
     cdict_find
     ************************************************************************ */
@@ -61,8 +41,8 @@ static void cdict_find_branches(branches_t const *b,
     char l = b->labels[i];
     if (c == l)
     {
-      index += branches_number(b, i);
-      cdict_find_node(b, BRANCHES(b)[i], word + 1, end, index, result);
+      index += branch_number(b, i);
+      cdict_find_node(b, branch(b, i), word + 1, end, index, result);
       return;
     }
     else if (c < l)
@@ -146,8 +126,8 @@ static int cdict_word_branches(branches_t const *b, int index,
   int next_number = 0;
   for (int i = 0; i < len;)
   {
-    int ni = branches_number(b, i);
-    ptr_t bi = BRANCHES(b)[i];
+    int ni = branch_number(b, i);
+    ptr_t bi = branch(b, i);
     if (ni > index)
       i = i * 2 + 1;
     else
@@ -260,10 +240,9 @@ static void suffixes_branches(cdict_t const *dict, branches_t const *b,
     int index, priority_t *dst)
 {
   int len = b->length;
-  ptr_t const *branches = BRANCHES(b);
   // TODO: Iterate branches in sorted order
   for (int i = 0; i < len; i++)
-    suffixes(dict, b, branches[i], index + branches_number(b, i), dst);
+    suffixes(dict, b, branch(b, i), index + branch_number(b, i), dst);
 }
 
 static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
@@ -314,20 +293,20 @@ static void distance_branches(cdict_t const *dict, branches_t const *b,
 {
   int len = b->length;
   char c = *word;
-  ptr_t const *branches = BRANCHES(b);
   for (int i = 0; i < len; i++)
   {
-    int next_index = index + branches_number(b, i);
+    int next_index = index + branch_number(b, i);
+    int bi = branch(b, i);
     if (c == b->labels[i])
     {
-      distance(dict, b, branches[i], word + 1, end, next_index, dist, q);
+      distance(dict, b, bi, word + 1, end, next_index, dist, q);
     }
     else
     {
       // Change a letter
-      distance(dict, b, branches[i], word + 1, end, next_index, dist - 1, q);
+      distance(dict, b, bi, word + 1, end, next_index, dist - 1, q);
       // Add a letter
-      distance(dict, b, branches[i], word, end, next_index, dist - 1, q);
+      distance(dict, b, bi, word, end, next_index, dist - 1, q);
     }
   }
 }
