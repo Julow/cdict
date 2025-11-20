@@ -23,12 +23,12 @@ module Optimized = struct
 
   module IdMap = Map.Make (Id)
 
-  type tr = { number : int; final : bool; next : Id.t }
+  type tr = { final : bool; next : Id.t }
 
   type branches = {
     labels : string;  (** Labels encodes a binary tree. *)
     branches : tr array;  (** Same length as [labels]. *)
-    numbers : Sized_int_array.t option;  (** Variable size. *)
+    numbers : Sized_int_array.t;  (** Variable size. *)
   }
 
   type node = Branches of branches | Prefix of string * tr
@@ -46,20 +46,9 @@ module Optimized = struct
     let length = List.length brs in
     let tree = Complete_tree.(to_array (of_sorted_list brs)) in
     let labels = String.init length (fun i -> fst tree.(i)) in
-    let branches = Array.map snd tree in
-    let branches, numbers =
-      if Array.exists (fun tr -> tr.number > C.c_MAX_PTR_NUMBER) branches then
-        let numbers =
-          Array.map (fun tr -> tr.number / C.c_MAX_PTR_NUMBER) branches
-        in
-        let branches =
-          Array.map
-            (fun tr -> { tr with number = tr.number mod C.c_MAX_PTR_NUMBER })
-            branches
-        in
-        (branches, Some (Sized_int_array.mk_detect ~signed:false numbers))
-      else (branches, None)
-    in
+    let branches = Array.map (fun (_, (_, tr)) -> tr) tree in
+    let numbers = Array.map (fun (_, (n, _)) -> n) tree in
+    let numbers = Sized_int_array.mk_detect ~signed:false numbers in
     Branches { labels; branches; numbers }
 
   module Seen = Dfa.Id.Map
@@ -91,13 +80,13 @@ module Optimized = struct
           fold_prefix dfa (String.make 1 c) next final
         in
         let ids, next = node_of_dfa seen ids dfa next in
-        add ids (Prefix (prefix, { next; number = 0; final }))
+        add ids (Prefix (prefix, { next; final }))
     | trs ->
         let ids, branches =
           List.fold_right
             (fun { c; next; number; final } (ids, acc) ->
               let ids, next = node_of_dfa seen ids dfa next in
-              (ids, (c, { next; number; final }) :: acc))
+              (ids, (c, (number, { next; final })) :: acc))
             trs (ids, [])
         in
         assert (branches = List.sort compare branches);
@@ -206,27 +195,25 @@ type kind = [ `Prefix | `Branches ]
 module Ptr : sig
   type t
 
-  val v : final:bool -> number:int -> kind -> int -> t
+  val v : final:bool -> kind -> int -> t
   val encode : node_off:int -> t -> int32
   val w : Buf.t -> int -> int -> t -> unit
 end = struct
-  type t = { final : bool; number : int; kind : kind; offset : int }
+  type t = { final : bool; kind : kind; offset : int }
 
   let tag_of_kind = function
     | `Prefix -> C.tag_PREFIX
     | `Branches -> C.tag_BRANCHES
 
-  let v ~final ~number kind offset = { final; number; kind; offset }
+  let v ~final kind offset = { final; kind; offset }
 
-  let encode ~node_off { final; number; kind; offset } =
+  let encode ~node_off { final; kind; offset } =
     let open Int32 in
     let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0l in
-    assert (number land lnot C.c_MAX_PTR_NUMBER = 0);
-    let number = shift_left (of_int number) C.c_PTR_NUMBER_OFFSET in
     (* Offsets are relative *)
-    let offset = offset - node_off in
-    let offset = shift_left (of_int offset) C.c_PTR_OFFSET_OFFSET in
-    logor number (logor final_flag (logor (tag_of_kind kind) offset))
+    let offset = of_int (offset - node_off) in
+    assert (logand offset C.mask_PTR_OFFSET_MASK = offset);
+    logor final_flag (logor (tag_of_kind kind) offset)
 
   let w b node_off off ptr = Buf.w_int32 b node_off off (encode ~node_off ptr)
 end
@@ -252,10 +239,7 @@ module Writer = struct
       b.b <- newb);
     off
 
-  let rec write_node seen b nodes { Optimized.final; number; next } =
-    write_node' seen b nodes ~final ~number next
-
-  and write_node' seen b nodes ~final ~number next =
+  let rec write_node seen b nodes { Optimized.final; next } =
     let kind, offset =
       match Seen.find_opt next !seen with
       | Some node -> node
@@ -270,20 +254,13 @@ module Writer = struct
           seen := Seen.add next node !seen;
           node
     in
-    Ptr.v ~final ~number kind offset
+    Ptr.v ~final kind offset
 
   and write_prefix_node seen b nodes p next =
     let len = String.length p in
     let off = alloc b (S.prefix_t + len) in
     let next_ptr = write_node seen b nodes next in
     let next_ptr = Ptr.encode ~node_off:off next_ptr in
-    assert (Int32.logand next_ptr C.mask_PTR_NUMBER_MASK = 0l);
-    let next_ptr =
-      Int32.(
-        logor
-          (logand (shift_right next_ptr 9) (lognot 0b11l))
-          (logand next_ptr 0b11l))
-    in
     w_int24 b off O.prefix_t_next_ptr (Int32.to_int next_ptr);
     w_uint8 b off O.prefix_t_length len;
     w_str b off O.prefix_t_prefix p;
@@ -294,18 +271,16 @@ module Writer = struct
     let branch_start_off = align4 (S.branches_t + length) in
     let numbers_start_off = branch_start_off + (length * S.ptr_t) in
     let number_byte_size, numbers_format, numbers_encoded =
-      match numbers with
-      | Some (format, ar) ->
-          let s, f =
-            match format with
-            | U8 -> (1, C.c_NUMBERS_8_BITS)
-            | U16 -> (2, C.c_NUMBERS_16_BITS)
-            | U24 -> (3, C.c_NUMBERS_24_BITS)
-            | _ -> assert false
-          in
-          assert (Bytes.length ar = length * s);
-          (s, f, ar)
-      | None -> (0, C.c_NUMBERS_NONE, Bytes.empty)
+      let format, ar = numbers in
+      let s, f =
+        match format with
+        | U8 -> (1, C.c_NUMBERS_8_BITS)
+        | U16 -> (2, C.c_NUMBERS_16_BITS)
+        | U24 -> (3, C.c_NUMBERS_24_BITS)
+        | _ -> assert false
+      in
+      assert (Bytes.length ar = length * s);
+      (s, f, ar)
     in
     let off = alloc b (numbers_start_off + (length * number_byte_size)) in
     let branch_off i = branch_start_off + (i * S.ptr_t) in
@@ -325,7 +300,7 @@ module Writer = struct
     let seen = ref Seen.empty in
     let header_off = alloc b S.header_t in
     assert (header_off = 0);
-    let root_tr = { Optimized.final = false; number = 0; next = root_id } in
+    let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     Ptr.w b header_off O.header_t_root_ptr root_ptr;
     let freq_off = alloc b (Freq.size freq) in
@@ -369,14 +344,8 @@ let stats ppf ((tree, _root_id), freq) =
   let str_of_node_kind' tr = str_of_node_kind (IdMap.find tr.next tree) in
   let tr_is_final tr = if tr.final then "Final" else "Non-final" in
   let pp_transitions ppf trs =
-    let tr_num_bytes { number = n; _ } =
-      if n <= 0xFFFF then if n <= 0xFF then 1 else 2
-      else if n <= 0xFFFFFF then 3
-      else 4
-    in
-    Format.fprintf ppf
-      "@[<v 2>Transitions: %d@ %a@ With numbers length in bytes: %a@]"
-      (List.length trs) (hist_str tr_is_final) trs (hist_int tr_num_bytes) trs
+    Format.fprintf ppf "@[<v 2>Transitions: %d@ %a@]" (List.length trs)
+      (hist_str tr_is_final) trs
   in
   let nodes = IdMap.fold (fun _ n acc -> n :: acc) tree [] in
   Format.fprintf ppf "Nodes: %d@\n" (List.length nodes);
@@ -389,10 +358,7 @@ let stats ppf ((tree, _root_id), freq) =
     (hist_int (fun b -> String.length b.labels))
     branches pp_transitions
     (List.concat_map (fun b -> Array.to_list b.branches) branches)
-    (hist_str (fun b ->
-         match b.numbers with
-         | Some (f, _) -> Sized_int_array.format_to_string f
-         | None -> "None"))
+    (hist_str (fun b -> Sized_int_array.format_to_string (fst b.numbers)))
     branches;
   let prefixes =
     List.filter_map
@@ -416,17 +382,18 @@ let rec pp freq nodes index ppf id =
   let open Optimized in
   let fpf fmt = Format.fprintf ppf fmt in
   match IdMap.find id nodes with
-  | Branches { labels; branches; _ } ->
+  | Branches { labels; branches; numbers } ->
       fpf "@[<v 2>Branches@ ";
       for i = 0 to Array.length branches - 1 do
-        fpf "%c %a@ " labels.[i] (pp_tr freq nodes index) branches.(i)
+        let n = Sized_int_array.get numbers i in
+        fpf "%c %a@ " labels.[i] (pp_tr freq nodes (index + n)) branches.(i)
       done;
       fpf "@]"
   | Prefix (prefix, next) ->
       fpf "@[<v 2>Prefix %S@ %a@]" prefix (pp_tr freq nodes index) next
 
 and pp_tr freq nodes index ppf tr =
-  let index = index + tr.number + if tr.final then 1 else 0 in
+  let index = if tr.final then index + 1 else index in
   Format.fprintf ppf "freq=%d@ " (Freq.get freq index);
   pp freq nodes index ppf tr.next
 

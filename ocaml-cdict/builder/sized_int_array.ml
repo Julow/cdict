@@ -48,7 +48,7 @@ let rec min_and_max min_ max_ ar i =
     min_and_max (Int.min n min_) (Int.max n max_) ar (i + 1)
 
 let detect_format force_signed ar =
-  if Array.length ar = 0 then I8
+  if Array.length ar = 0 then U8
   else
     let first = ar.(0) in
     let min, max_ = min_and_max first first ar 1 in

@@ -24,13 +24,7 @@ static inline int decode_int24(uint8_t const *ar)
 
 static inline int decode_uint24(uint8_t const *ar)
 {
-  return (ar[0] << 16) | (ar[1] << 8) | ar[2];
-}
-
-static inline int decode_prefix_next_ptr(prefix_t const *p)
-{
-  int ptr = decode_int24(p->next_ptr);
-  return ((ptr & ~0b11) << 9) | (ptr & 0b11);
+  return (int)(unsigned)((ar[0] << 16) | (ar[1] << 8) | ar[2]);
 }
 
 static inline int branches_number(branches_t const *b, int branch_i)
@@ -39,11 +33,11 @@ static inline int branches_number(branches_t const *b, int branch_i)
   uint8_t const *ar = BRANCHES_NUMBERS(b) + branch_i *
     BRANCHES_NUMBERS_FORMAT_BYTE_LENGTH(format);
   if (format == NUMBERS_8_BITS)
-    return ar[0] * MAX_PTR_NUMBER;
+    return ar[0];
   else if (format == NUMBERS_16_BITS)
-    return ((ar[0] << 8) | ar[1]) * MAX_PTR_NUMBER;
+    return ((ar[0] << 8) | ar[1]);
   else if (format == NUMBERS_24_BITS)
-    return decode_uint24(ar) * MAX_PTR_NUMBER;
+    return decode_uint24(ar);
   else
     return 0;
 }
@@ -89,14 +83,13 @@ static void cdict_find_prefix(prefix_t const *node,
     if (prefix == prefix_end) break; // Prefix matches
     if (word == end) return; // Query ends
   }
-  cdict_find_node(node, decode_prefix_next_ptr(node), word, end, index, result);
+  cdict_find_node(node, decode_int24(node->next_ptr), word, end, index, result);
 }
 
 static void cdict_find_node(void const *parent_node, ptr_t ptr,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
   void const *node = PTR_NODE(ptr, parent_node);
-  index += PTR_NUMBER(ptr);
   if (word == end)
   {
     result->found = (bool)PTR_IS_FINAL(ptr);
@@ -155,7 +148,7 @@ static int cdict_word_branches(branches_t const *b, int index,
   {
     int ni = branches_number(b, i);
     ptr_t bi = BRANCHES(b)[i];
-    if (PTR_NUMBER(bi) + ni > index)
+    if (ni > index)
       i = i * 2 + 1;
     else
     {
@@ -180,7 +173,7 @@ static int cdict_word_prefix(prefix_t const *p, int index,
     end = max_len;
   while (dsti < end)
     dst[dsti++] = *(prefix++);
-  return cdict_word_node(p, decode_prefix_next_ptr(p), index, dst, end, max_len);
+  return cdict_word_node(p, decode_int24(p->next_ptr), index, dst, end, max_len);
 }
 
 static int cdict_word_node(void const *parent_node, ptr_t ptr, int index,
@@ -189,7 +182,6 @@ static int cdict_word_node(void const *parent_node, ptr_t ptr, int index,
   if (dsti >= max_len)
     return dsti;
   void const *node = PTR_NODE(ptr, parent_node);
-  index -= PTR_NUMBER(ptr);
   if (PTR_IS_FINAL(ptr))
   {
     if (index == 0)
@@ -278,7 +270,6 @@ static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
     int index, priority_t *dst)
 {
   void const *node = PTR_NODE(ptr, parent_node);
-  index += PTR_NUMBER(ptr);
   if (PTR_IS_FINAL(ptr))
   {
     priority_add(dst, cdict_freq(dict, index), index);
@@ -290,7 +281,7 @@ static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
       suffixes_branches(dict, node, index, dst);
       break;
     case PREFIX:
-      suffixes(dict, node, decode_prefix_next_ptr((prefix_t const*)node),
+      suffixes(dict, node, decode_int24(((prefix_t const*)node)->next_ptr),
           index, dst);
       break;
   }
@@ -379,14 +370,14 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   if (word_len < len)
   {
     if (pdist + 1 == dist)
-      suffixes(dict, p, decode_prefix_next_ptr(p), index, q);
+      suffixes(dict, p, decode_int24(p->next_ptr), index, q);
     return;
   }
   int next_dist = dist - pdist;
   for (int i = len; i >= 0 && next_dist >= 0; i--)
   {
     // Add suffixes of 'p', including the empty suffix.
-    distance(dict, p, decode_prefix_next_ptr(p), word + i, end, index, next_dist, q);
+    distance(dict, p, decode_int24(p->next_ptr), word + i, end, index, next_dist, q);
     next_dist--;
   }
 }
@@ -409,14 +400,13 @@ static void distance(cdict_t const *dict, void const *parent_node, ptr_t ptr,
     return;
   }
   void const *node = PTR_NODE(ptr, parent_node);
-  index += PTR_NUMBER(ptr);
   if (PTR_IS_FINAL(ptr))
     index++;
   switch (PTR_KIND(ptr))
   {
     case BRANCHES:
       // Remove a letter
-      distance(dict, parent_node, ptr & ~(PTR_NUMBER_MASK | PTR_FLAG_FINAL),
+      distance(dict, parent_node, ptr & ~PTR_FLAG_FINAL,
           word + 1, end, index, dist - 1, q);
       return distance_branches(dict, node, word, end, index, dist, q);
     case PREFIX:

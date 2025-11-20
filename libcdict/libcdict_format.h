@@ -30,13 +30,6 @@ typedef enum
 /** Whether the pointer is a final transition. */
 #define PTR_FLAG_FINAL 0b10
 
-// Number field (8 bits unsigned integer)
-#define MAX_PTR_NUMBER 0xFFu
-#define PTR_NUMBER_OFFSET 3
-#define PTR_NUMBER_MASK (MAX_PTR_NUMBER << PTR_NUMBER_OFFSET)
-
-#define PTR_NUMBER(PTR) ((int)(((PTR) & PTR_NUMBER_MASK) >> PTR_NUMBER_OFFSET))
-
 // Kind and flags (2 bits)
 #define PTR_KIND_MASK 0b1u
 #define PTR_FLAGS_MASK PTR_FLAG_FINAL
@@ -44,11 +37,10 @@ typedef enum
 #define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
 #define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
 
-// Offset field (21 bits signed integer)
-#define PTR_OFFSET_OFFSET 11
-#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK | PTR_NUMBER_MASK))
+// Offset field
+#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK))
 
-#define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + ((PTR) >> PTR_OFFSET_OFFSET))
+#define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + (int)((PTR) & PTR_OFFSET_MASK))
 
 /** BRANCHES nodes (size = 4 bytes + array)
 
@@ -67,8 +59,7 @@ typedef struct
       'branches' array. */
   char labels[];
   // ptr_t branches[]; /** Use [BRANCHES(b)] to access. */
-  // char numbers_256[];
-  // /** Number divided by MAX_PTR_NUMBER. Use [NUMBERS(b)] to access. */
+  // char numbers[]; /** Use [NUMBERS(b)] to access. */
 } branches_t;
 
 /** Pointer to the 'branches' array. */

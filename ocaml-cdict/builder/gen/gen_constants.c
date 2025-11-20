@@ -26,9 +26,6 @@ int main()
 {
   module("C");
 
-  VAL(c_, MAX_PTR_NUMBER);
-  VAL(c_, PTR_NUMBER_OFFSET);
-  VAL(c_, PTR_OFFSET_OFFSET);
   VAL(c_, NUMBERS_NONE);
   VAL(c_, NUMBERS_8_BITS);
   VAL(c_, NUMBERS_16_BITS);
@@ -37,7 +34,6 @@ int main()
   VAL_INT32(mask_, PTR_KIND_MASK);
   VAL_INT32(mask_, PTR_FLAGS_MASK);
   VAL_INT32(mask_, PTR_OFFSET_MASK);
-  VAL_INT32(mask_, PTR_NUMBER_MASK);
   VAL_INT32(mask_, BRANCHES_NUMBERS_FORMAT_MASK);
   VAL_INT32(flag_, PTR_FLAG_FINAL);
   VAL_INT32(tag_, BRANCHES);

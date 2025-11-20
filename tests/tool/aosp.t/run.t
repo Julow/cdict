@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  72K dict
+  84K dict
 
   $ cdict-tool query dict type module function value match
   found: "type" freq=15 index=7526
@@ -147,8 +147,7 @@ Stats:
     | 25: 1    | 26: 1    | 27: 1    | 68: 1    |
     Transitions: 7597
       | Final: 2081 | Non-final: 5516 |
-      With numbers length in bytes: |  1: 7597 |
-    With numbers format: | None: 2249 | U8: 13   |
+    With numbers format: | U16: 13   | U8: 2249 |
   Prefix nodes: 2523
     Followed by:
     | Branches: 2116 | Prefix: 407  |
@@ -158,7 +157,6 @@ Stats:
     | 13: 4    | 15: 1    | 17: 1    | 19: 1    | 27: 1    | 61: 1    |
     Transitions: 2523
       | Final: 2061 | Non-final: 462  |
-      With numbers length in bytes: |  1: 2523 |
   Freq: 7984
     With value:
     |  0: 2611 |  5: 1156 |  7: 666  |  8: 453  |  9: 342  | 10: 281 
