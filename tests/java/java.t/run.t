@@ -101,6 +101,9 @@
   close match: overlay distance=2 freq=0
   close match: overlook distance=2 freq=0
   not found: enum
+  prefix: enumerate freq=13 index=3885
+  prefix: enumerated freq=10 index=3886
+  prefix: enumeration freq=0 index=3887
   close match: num distance=1 freq=14
   close match: enumerate distance=1 freq=13
   close match: vnum distance=1 freq=12
