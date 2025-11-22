@@ -185,7 +185,7 @@ int cdict_word(cdict_t const *dict, int index, char *dst, int max_length)
 }
 
 /** ************************************************************************
-    Priority queue storing the N most frequent words.
+    Priority max-queue storing the N most frequent words.
     ************************************************************************ */
 
 typedef struct
@@ -230,30 +230,53 @@ static int priority_to_sorted_array(priority_t *p, int *dst, int count)
   return count;
 }
 
-/** Add a word to the priority queue, if possible. Do nothing if the queue is
-    full and the new word ranks lower than any other word already stored.
-    Stable: If two words with equal priority are added, the one added first
-    ranks higher. */
+/** Push an element and remove the lowest ranking element at the same time.
+    The removed element can be the same as the element being added. This
+    function works even when the queue is full. */
+static void priority_pushpop(priority_t *p, word_freq_t new)
+{
+  word_freq_t *q = p->q;
+  if (p->ends == 0 || word_freq_compare(&q[0], &new) <= 0)
+    return;
+  int i = 0, biggest = 0, ends = p->ends;
+  while (true)
+  {
+    int left = i * 2 + 1, right = i * 2 + 2;
+    if (left >= ends)
+      break;
+    biggest = (right < ends && word_freq_compare(&q[right], &q[left]) > 0) ?
+      right : left;
+    if (word_freq_compare(&q[biggest], &new) <= 0)
+      break;
+    q[i] = q[biggest];
+    i = biggest;
+  }
+  q[i] = new;
+}
+
+/** Add a word to the priority queue, possibly removing an other word from it.
+    Do nothing if the queue is full and the new word ranks higher than any
+    other word already stored. Words are ordered with [word_freq_compare()]. */
 static void priority_add(priority_t *p, int freq, int index)
 {
-  int i = p->ends;
+  word_freq_t new = (word_freq_t){ .freq = freq, .index = index };
   if (p->ends == p->max_length)
   {
-    i--;
-    if (p->q[i].freq >= freq)
-      return; // New word ranks lower than the lowest already in the queue
+    priority_pushpop(p, new);
+    return;
   }
-  else
-    p->ends++;
+  word_freq_t *q = p->q;
+  int i = p->ends;
+  p->ends++;
   while (i > 0)
   {
     int parent = (i - 1) / 2;
-    if (p->q[parent].freq >= freq)
+    if (word_freq_compare(&q[parent], &new) >= 0)
       break;
-    p->q[i] = p->q[parent];
+    q[i] = q[parent];
     i = parent;
   }
-  p->q[i] = (word_freq_t){ .freq = freq, .index = index };
+  q[i] = new;
 }
 
 /** ************************************************************************

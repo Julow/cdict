@@ -11,18 +11,18 @@
   prefix: "type" freq=15 index=7526
   prefix: "types" freq=15 index=7537
   prefix: "typexpr" freq=15 index=7540
-  prefix: "typedecl" freq=5 index=7532
-  prefix: "typename" freq=0 index=7535
+  prefix: "typeconstr" freq=14 index=7530
+  prefix: "typed" freq=11 index=7531
   close match: "type" distance=1 freq=15 index=7526
   close match: "types" distance=1 freq=15 index=7537
   close match: "typexpr" distance=1 freq=15 index=7540
-  close match: "typed" distance=1 freq=11 index=7531
-  close match: "typer" distance=1 freq=0 index=7536
+  close match: "Type" distance=1 freq=14 index=2115
+  close match: "typeconstr" distance=1 freq=14 index=7530
+  close match: "byte" distance=2 freq=15 index=2831
   close match: "the" distance=2 freq=15 index=7347
-  close match: "type" distance=2 freq=15 index=7526
-  close match: "type" distance=2 freq=15 index=7526
-  close match: "Byte" distance=2 freq=8 index=614
-  close match: "pipe" distance=2 freq=5 index=5980
+  close match: "the" distance=2 freq=15 index=7347
+  close match: "time" distance=2 freq=15 index=7387
+  close match: "true" distance=2 freq=15 index=7493
   found: "module" freq=15 index=5399
   prefix: "module" freq=15 index=5399
   prefix: "modules" freq=15 index=5404
@@ -34,11 +34,11 @@
   close match: "Module" distance=1 freq=14 index=1466
   close match: "modulo" distance=1 freq=13 index=5406
   close match: "mdule" distance=1 freq=11 index=5286
+  close match: "mode" distance=2 freq=15 index=5384
   close match: "module" distance=2 freq=15 index=5399
   close match: "module" distance=2 freq=15 index=5399
   close match: "module" distance=2 freq=15 index=5399
-  close match: "Module" distance=2 freq=14 index=1466
-  close match: "Modulo" distance=2 freq=0 index=1472
+  close match: "module" distance=2 freq=15 index=5399
   found: "function" freq=15 index=4302
   prefix: "function" freq=15 index=4302
   prefix: "functions" freq=15 index=4306
@@ -53,8 +53,8 @@
   close match: "function" distance=2 freq=15 index=4302
   close match: "function" distance=2 freq=15 index=4302
   close match: "function" distance=2 freq=15 index=4302
-  close match: "Function" distance=2 freq=10 index=1063
-  close match: "Functions" distance=2 freq=9 index=1066
+  close match: "function" distance=2 freq=15 index=4302
+  close match: "function" distance=2 freq=15 index=4302
   found: "value" freq=15 index=7722
   prefix: "value" freq=15 index=7722
   prefix: "valuerestriction" freq=0 index=7723
@@ -65,8 +65,8 @@
   close match: "false" distance=2 freq=15 index=4110
   close match: "value" distance=2 freq=15 index=7722
   close match: "value" distance=2 freq=15 index=7722
-  close match: "Blue" distance=2 freq=5 index=593
-  close match: "blue" distance=2 freq=5 index=2756
+  close match: "value" distance=2 freq=15 index=7722
+  close match: "value" distance=2 freq=15 index=7722
   found: "match" freq=15 index=5267
   prefix: "match" freq=15 index=5267
   prefix: "matching" freq=15 index=5270
@@ -75,13 +75,13 @@
   close match: "match" distance=1 freq=15 index=5267
   close match: "matching" distance=1 freq=15 index=5270
   close match: "Match" distance=1 freq=14 index=1428
-  close match: "batch" distance=1 freq=11 index=2679
-  close match: "Batch" distance=1 freq=0 index=566
+  close match: "matched" distance=1 freq=14 index=5268
+  close match: "matches" distance=1 freq=14 index=5269
   close match: "each" distance=2 freq=15 index=3752
+  close match: "machine" distance=2 freq=15 index=5198
   close match: "match" distance=2 freq=15 index=5267
-  close match: "path" distance=2 freq=15 index=5915
-  close match: "batch" distance=2 freq=11 index=2679
-  close match: "Batch" distance=2 freq=0 index=566
+  close match: "match" distance=2 freq=15 index=5267
+  close match: "match" distance=2 freq=15 index=5267
 
   $ cdict-tool query dict overload enum defensive coding
   not found: "overload"
@@ -99,8 +99,8 @@
   close match: "em" distance=2 freq=15 index=3800
   close match: "end" distance=2 freq=15 index=3844
   close match: "number" distance=2 freq=15 index=5626
-  close match: "Num" distance=2 freq=11 index=1553
-  close match: "nsm" distance=2 freq=7 index=5619
+  close match: "num" distance=2 freq=14 index=5623
+  close match: "num" distance=2 freq=14 index=5623
   not found: "defensive"
   not found: "coding"
   close match: "coming" distance=1 freq=5 index=3093
@@ -108,29 +108,29 @@
   close match: "adding" distance=2 freq=13 index=2346
   close match: "encoding" distance=2 freq=13 index=3838
   close match: "ending" distance=2 freq=13 index=3849
-  close match: "Coding" distance=2 freq=0 index=712
-  close match: "owing" distance=2 freq=0 index=5843
+  close match: "copying" distance=2 freq=12 index=3312
+  close match: "copying" distance=2 freq=12 index=3312
   [4]
 
 Prefix search:
 
   $ cdict-tool query dict typ
   found: "typ" freq=15 index=7524
+  prefix: "typ" freq=15 index=7524
   prefix: "type" freq=15 index=7526
   prefix: "types" freq=15 index=7537
   prefix: "typexpr" freq=15 index=7540
-  prefix: "typical" freq=12 index=7542
-  prefix: "typable" freq=0 index=7525
+  prefix: "typeconstr" freq=14 index=7530
   close match: "top" distance=1 freq=15 index=7416
   close match: "typ" distance=1 freq=15 index=7524
   close match: "type" distance=1 freq=15 index=7526
-  close match: "typing" distance=1 freq=13 index=7544
-  close match: "typical" distance=1 freq=12 index=7542
+  close match: "types" distance=1 freq=15 index=7537
+  close match: "typexpr" distance=1 freq=15 index=7540
+  close match: "map" distance=2 freq=15 index=5250
   close match: "p" distance=2 freq=15 index=5847
-  close match: "to" distance=2 freq=15 index=7399
-  close match: "typ" distance=2 freq=15 index=7524
-  close match: "up" distance=2 freq=15 index=7681
-  close match: "Typ" distance=2 freq=12 index=2113
+  close match: "t1" distance=2 freq=15 index=7253
+  close match: "tag" distance=2 freq=15 index=7272
+  close match: "tex" distance=2 freq=15 index=7331
 
 Stats:
 
