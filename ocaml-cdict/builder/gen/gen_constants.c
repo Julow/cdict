@@ -55,7 +55,6 @@ int main()
   end();
   module("S");
 
-  SIZE(ptr_t);
   SIZE(branches_t);
   SIZE(prefix_t);
   SIZE(header_t);

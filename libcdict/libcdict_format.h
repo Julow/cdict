@@ -147,7 +147,7 @@ Located at the beginning of the dictionary.
 
 typedef struct
 {
-  ptr_t root_ptr;
+  int root_ptr;
   int32_t freq_off;
   /** Offset to the 4-bits integer array storing the frequency of each words. */
 } header_t;

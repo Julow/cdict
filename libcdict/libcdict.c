@@ -26,7 +26,7 @@ static inline int decode_int24(uint8_t const *ar)
     cdict_find
     ************************************************************************ */
 
-static void cdict_find_node(void const *parent_node, ptr_t ptr,
+static void cdict_find_node(void const *parent_node, int ptr,
     char const *word, char const *end, int index, cdict_result_t *result);
 
 static void cdict_find_branches(branches_t const *b,
@@ -66,7 +66,7 @@ static void cdict_find_prefix(prefix_t const *node,
   cdict_find_node(node, decode_int24(node->next_ptr), word, end, index, result);
 }
 
-static void cdict_find_node(void const *parent_node, ptr_t ptr,
+static void cdict_find_node(void const *parent_node, int ptr,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
   void const *node = PTR_NODE(ptr, parent_node);
@@ -114,7 +114,7 @@ int cdict_freq(cdict_t const *dict, int index)
     cdict_word
     ************************************************************************ */
 
-static int cdict_word_node(void const *parent_node, ptr_t ptr, int index,
+static int cdict_word_node(void const *parent_node, int ptr, int index,
     char *dst, int dsti, int max_len);
 
 static int cdict_word_branches(branches_t const *b, int index,
@@ -122,12 +122,12 @@ static int cdict_word_branches(branches_t const *b, int index,
 {
   // The 'number' field of each transition is in the same order as the labels.
   int len = b->length;
-  ptr_t next = 0;
+  int next = 0;
   int next_number = 0;
   for (int i = 0; i < len;)
   {
     int ni = branch_number(b, i);
-    ptr_t bi = branch(b, i);
+    int bi = branch(b, i);
     if (ni > index)
       i = i * 2 + 1;
     else
@@ -156,7 +156,7 @@ static int cdict_word_prefix(prefix_t const *p, int index,
   return cdict_word_node(p, decode_int24(p->next_ptr), index, dst, end, max_len);
 }
 
-static int cdict_word_node(void const *parent_node, ptr_t ptr, int index,
+static int cdict_word_node(void const *parent_node, int ptr, int index,
     char *dst, int dsti, int max_len)
 {
   if (dsti >= max_len)
@@ -233,7 +233,7 @@ static void priority_add(priority_t *p, int freq, int index)
     cdict_suffixes
     ************************************************************************ */
 
-static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
+static void suffixes(cdict_t const *dict, void const *parent_node, int ptr,
     int index, priority_t *dst);
 
 static void suffixes_branches(cdict_t const *dict, branches_t const *b,
@@ -245,7 +245,7 @@ static void suffixes_branches(cdict_t const *dict, branches_t const *b,
     suffixes(dict, b, branch(b, i), index + branch_number(b, i), dst);
 }
 
-static void suffixes(cdict_t const *dict, void const *parent_node, ptr_t ptr,
+static void suffixes(cdict_t const *dict, void const *parent_node, int ptr,
     int index, priority_t *dst)
 {
   void const *node = PTR_NODE(ptr, parent_node);
@@ -285,7 +285,7 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
     cdict_distance
     ************************************************************************ */
 
-static void distance(cdict_t const *dict, void const *parent_node, ptr_t ptr,
+static void distance(cdict_t const *dict, void const *parent_node, int ptr,
     char const *word, char const *end, int index, int dist, priority_t *q);
 
 static void distance_branches(cdict_t const *dict, branches_t const *b,
@@ -361,7 +361,7 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   }
 }
 
-static void distance(cdict_t const *dict, void const *parent_node, ptr_t ptr,
+static void distance(cdict_t const *dict, void const *parent_node, int ptr,
     char const *word, char const *end, int index, int dist, priority_t *q)
 {
   if (dist == 0)
