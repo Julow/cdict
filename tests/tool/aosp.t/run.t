@@ -13,11 +13,11 @@
   prefix: "typexpr" freq=15 index=7540
   prefix: "typeconstr" freq=14 index=7530
   prefix: "typed" freq=11 index=7531
-  close match: "type" distance=1 freq=15 index=7526
   close match: "types" distance=1 freq=15 index=7537
   close match: "typexpr" distance=1 freq=15 index=7540
   close match: "Type" distance=1 freq=14 index=2115
   close match: "typeconstr" distance=1 freq=14 index=7530
+  close match: "typed" distance=1 freq=11 index=7531
   close match: "byte" distance=2 freq=15 index=2831
   close match: "the" distance=2 freq=15 index=7347
   close match: "the" distance=2 freq=15 index=7347
@@ -29,11 +29,11 @@
   prefix: "moduleexamples" freq=10 index=5401
   prefix: "modulealias" freq=5 index=5400
   prefix: "modulename" freq=5 index=5402
-  close match: "module" distance=1 freq=15 index=5399
   close match: "modules" distance=1 freq=15 index=5404
   close match: "Module" distance=1 freq=14 index=1466
   close match: "modulo" distance=1 freq=13 index=5406
   close match: "mdule" distance=1 freq=11 index=5286
+  close match: "moduleexamples" distance=1 freq=10 index=5401
   close match: "mode" distance=2 freq=15 index=5384
   close match: "module" distance=2 freq=15 index=5399
   close match: "module" distance=2 freq=15 index=5399
@@ -45,11 +45,11 @@
   prefix: "functional" freq=14 index=4303
   prefix: "functionals" freq=7 index=4305
   prefix: "functionality" freq=5 index=4304
-  close match: "function" distance=1 freq=15 index=4302
   close match: "functions" distance=1 freq=15 index=4306
   close match: "functional" distance=1 freq=14 index=4303
   close match: "Function" distance=1 freq=10 index=1063
   close match: "functionals" distance=1 freq=7 index=4305
+  close match: "functionality" distance=1 freq=5 index=4304
   close match: "function" distance=2 freq=15 index=4302
   close match: "function" distance=2 freq=15 index=4302
   close match: "function" distance=2 freq=15 index=4302
@@ -58,7 +58,6 @@
   found: "value" freq=15 index=7722
   prefix: "value" freq=15 index=7722
   prefix: "valuerestriction" freq=0 index=7723
-  close match: "value" distance=1 freq=15 index=7722
   close match: "values" distance=1 freq=15 index=7724
   close match: "Value" distance=1 freq=8 index=2185
   close match: "valuerestriction" distance=1 freq=0 index=7723
@@ -72,11 +71,11 @@
   prefix: "matching" freq=15 index=5270
   prefix: "matched" freq=14 index=5268
   prefix: "matches" freq=14 index=5269
-  close match: "match" distance=1 freq=15 index=5267
   close match: "matching" distance=1 freq=15 index=5270
   close match: "Match" distance=1 freq=14 index=1428
   close match: "matched" distance=1 freq=14 index=5268
   close match: "matches" distance=1 freq=14 index=5269
+  close match: "batch" distance=1 freq=11 index=2679
   close match: "each" distance=2 freq=15 index=3752
   close match: "machine" distance=2 freq=15 index=5198
   close match: "match" distance=2 freq=15 index=5267
@@ -103,7 +102,7 @@
   close match: "end" distance=2 freq=15 index=3844
   close match: "number" distance=2 freq=15 index=5626
   close match: "num" distance=2 freq=14 index=5623
-  close match: "num" distance=2 freq=14 index=5623
+  close match: "numbers" distance=2 freq=14 index=5629
   not found: "defensive"
   not found: "coding"
   close match: "coming" distance=1 freq=5 index=3093
@@ -125,10 +124,10 @@ Prefix search:
   prefix: "typexpr" freq=15 index=7540
   prefix: "typeconstr" freq=14 index=7530
   close match: "top" distance=1 freq=15 index=7416
-  close match: "typ" distance=1 freq=15 index=7524
   close match: "type" distance=1 freq=15 index=7526
   close match: "types" distance=1 freq=15 index=7537
   close match: "typexpr" distance=1 freq=15 index=7540
+  close match: "typeconstr" distance=1 freq=14 index=7530
   close match: "map" distance=2 freq=15 index=5250
   close match: "p" distance=2 freq=15 index=5847
   close match: "t1" distance=2 freq=15 index=7253

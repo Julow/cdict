@@ -397,17 +397,17 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   int word_len = ((intptr_t)end) - ((intptr_t)word);
   int common_len = min(word_len, len);
   int pdist = levenshtein_distance(word, common_len, p->prefix, common_len);
+  int next_ptr = decode_int24(p->next_ptr);
   if (word_len < len)
   {
     if (pdist + 1 == dist)
-      suffixes(dict, p, decode_int24(p->next_ptr), index, q);
-    return;
+      return suffixes(dict, p, next_ptr, index, q);
   }
   int next_dist = dist - pdist;
   for (int i = len; i >= 0 && next_dist >= 0; i--)
   {
     // Add suffixes of 'p', including the empty suffix.
-    distance(dict, p, decode_int24(p->next_ptr), word + i, end, index, next_dist, q);
+    distance(dict, p, next_ptr, word + i, end, index, next_dist, q);
     next_dist--;
   }
 }
@@ -423,21 +423,24 @@ static void distance(cdict_t const *dict, void const *parent_node, int ptr,
       priority_add(q, cdict_freq(dict, r.index), r.index);
     return;
   }
-  if (word == end)
-  {
-    if (dist == 1) // Adding a suffixe of any length is a single edit
-      suffixes(dict, parent_node, ptr, index, q);
-    return;
-  }
   void const *node = PTR_NODE(ptr, parent_node);
   if (PTR_IS_FINAL(ptr))
     index++;
+  if (word == end)
+  {
+    // Adding a suffixe of any length is a single edit
+    // Remove the final flag before calling [suffixes] to avoid returning the
+    // queried word and to avoid incrementing [index] twice.
+    if (dist == 1)
+      suffixes(dict, node, (ptr & PTR_KIND_MASK), index, q);
+    return;
+  }
   switch (PTR_KIND(ptr))
   {
     case BRANCHES:
       // Remove a letter
-      distance(dict, parent_node, ptr & ~PTR_FLAG_FINAL,
-          word + 1, end, index, dist - 1, q);
+      distance(dict, node, (ptr & PTR_KIND_MASK), word + 1, end,
+          index, dist - 1, q);
       return distance_branches(dict, node, word, end, index, dist, q);
     case PREFIX:
       return distance_prefix(dict, node, word, end, index, dist, q);
