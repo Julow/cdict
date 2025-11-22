@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 cdict_t cdict_of_string(char const *data, int size)
 {
@@ -21,6 +22,8 @@ static inline int decode_int24(uint8_t const *ar)
 {
   return (((int)(int8_t)ar[0]) << 16) | (ar[1] << 8) | ar[2];
 }
+
+static inline int min(int a, int b) { return (a < b) ? a : b; }
 
 /** ************************************************************************
     cdict_find
@@ -187,9 +190,21 @@ int cdict_word(cdict_t const *dict, int index, char *dst, int max_length)
 
 typedef struct
 {
-  int freq:4;
-  int index:28;
+  unsigned int freq:4;
+  unsigned int index:28;
 } word_freq_t;
+
+/** Orders by decreasing frequencies. Elements with the same frequency are
+    ordered by increasing [index] value, which corresponds to the alphabetical
+    order. */
+static int word_freq_compare(void const *a_, void const *b_)
+{
+  word_freq_t const *a = a_;
+  word_freq_t const *b = b_;
+  int d = b->freq - a->freq;
+  if (d != 0) return d;
+  return a->index - b->index;
+}
 
 typedef struct
 {
@@ -201,6 +216,18 @@ typedef struct
 static void priority_init(priority_t *p, word_freq_t *q, int q_len)
 {
   *p = (priority_t){ .q = q, .ends = 0, .max_length = q_len };
+}
+
+/** This modifies the structure [p] inplace and then empties it. Returns the
+    number of elements written to [dst]. */
+static int priority_to_sorted_array(priority_t *p, int *dst, int count)
+{
+  qsort(p->q, p->ends, sizeof(word_freq_t), &word_freq_compare);
+  count = min(count, p->ends);
+  for (int i = 0; i < count; i++)
+    dst[i] = p->q[i].index;
+  p->ends = 0;
+  return count;
 }
 
 /** Add a word to the priority queue, if possible. Do nothing if the queue is
@@ -276,9 +303,7 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
   priority_init(&queue, words, count);
   suffixes(dict, PREFIX_PTR_NODE(r->prefix_ptr), PREFIX_PTR_PTR(r->prefix_ptr),
       r->index, &queue);
-  for (int i = 0; i < queue.ends; i++)
-    dst[i] = words[i].index;
-  return queue.ends;
+  return priority_to_sorted_array(&queue, dst, count);
 }
 
 /** ************************************************************************
@@ -310,8 +335,6 @@ static void distance_branches(cdict_t const *dict, branches_t const *b,
     }
   }
 }
-
-static inline int min(int a, int b) { return (a < b) ? a : b; }
 
 /** Levenshtein distance between the strings 'a' and 'b'. */
 static int levenshtein_distance(char const *a, int a_length,
@@ -400,7 +423,5 @@ int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
   priority_t queue;
   priority_init(&queue, words, count);
   distance(dict, dict->data, dict->root_ptr, word, word + wlen, 0, dist, &queue);
-  for (int i = 0; i < queue.ends; i++)
-    dst[i] = words[i].index;
-  return queue.ends;
+  return priority_to_sorted_array(&queue, dst, count);
 }
