@@ -6,24 +6,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-cdict_t cdict_of_string(char const *data, int size)
-{
-  header_t const *h = (void const*)data;
-  cdict_t dict = {
-    .data = data,
-    .size = size,
-    .root_ptr = h->root_ptr,
-    .freq = (uint8_t const*)(data + h->freq_off)
-  };
-  return dict;
-}
-
 static inline int decode_int24(uint8_t const *ar)
 {
   return (((int)(int8_t)ar[0]) << 16) | (ar[1] << 8) | ar[2];
 }
 
+static inline int decode_int32(uint8_t const *ar)
+{
+  return (decode_int24(ar) << 8) | ar[3];
+}
+
 static inline int min(int a, int b) { return (a < b) ? a : b; }
+
+/** ************************************************************************
+    cdict_of_string
+    ************************************************************************ */
+
+cdict_t cdict_of_string(char const *data, int size)
+{
+  header_t const *h = (void const*)data;
+  int root_ptr = decode_int32(h->root_ptr);
+  int freq_off = decode_int32(h->freq_off);
+  cdict_t dict = {
+    .data = data,
+    .size = size,
+    .root_ptr = root_ptr,
+    .freq = (uint8_t const*)(data + freq_off)
+  };
+  return dict;
+}
 
 /** ************************************************************************
     cdict_find

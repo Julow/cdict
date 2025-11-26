@@ -1,6 +1,16 @@
 /** libdict
 
 This file describes the encoding of the dictionary.
+
+Dictionaries are made of BRANCHES and PREFIX nodes that each consume a part of
+the query and contain transitions to the next nodes.
+
+Transitions are made of:
+- a pointer, a relative signed offset to the next node,
+- a number, used to compute the word index and
+- a final flag, that signals that we reached the end of a word.
+
+All integers are in big-endian order.
 */
 
 #include <stdint.h>
@@ -120,7 +130,7 @@ The length cannot be 0.
 
 typedef struct
 {
-  uint8_t next_ptr[3]; /** 24-bits big-endian integer. */
+  uint8_t next_ptr[3]; /** 24-bits big-endian signed integer. */
   uint8_t length;
   char prefix[];
 } prefix_t;
@@ -147,7 +157,9 @@ Located at the beginning of the dictionary.
 
 typedef struct
 {
-  int root_ptr;
-  int32_t freq_off;
-  /** Offset to the 4-bits integer array storing the frequency of each words. */
+  uint8_t root_ptr[4];
+  /** 32-bits big-endian signed integer. Pointer to the root node. */
+  uint8_t freq_off[4];
+  /** 32-bits big-endian signed integer. Offset to the 4-bits integer array
+      storing the frequency of each words. */
 } header_t;

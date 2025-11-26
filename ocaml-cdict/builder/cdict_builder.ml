@@ -171,7 +171,7 @@ module Buf = struct
   let output out_chan b = Out_channel.output out_chan b.b 0 b.end_
 
   module Open = struct
-    let w_int32 b node_off off i = Bytes.set_int32_le b.b (node_off + off) i
+    let w_int32 b node_off off i = Bytes.set_int32_be b.b (node_off + off) i
     let w_uint8 b node_off off i = Bytes.set_uint8 b.b (node_off + off) i
 
     let w_int24 b node_off off i =
@@ -306,10 +306,8 @@ module Writer = struct
     let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     let root_ptr = Ptr.encode ~node_off:0 root_ptr in
-    (* TODO: Integer with unspecified endianness *)
     w_int32 b header_off O.header_t_root_ptr (Int32.of_int root_ptr);
     let freq_off = alloc b (Freq.size freq) in
-    (* TODO: Integer with unspecified endianness *)
     w_int32 b header_off O.header_t_freq_off (Int32.of_int freq_off);
     w_str b freq_off 0 (freq :> string)
 end
