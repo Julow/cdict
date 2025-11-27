@@ -1,3 +1,5 @@
+[@@@warning "-52"] (* Warning on string patterns matching [Failure] argument. *)
+
 let fail fmt = Format.kasprintf failwith fmt
 
 let create words =
@@ -83,3 +85,15 @@ let () =
     match ws with [] -> () | _ :: tl -> loop tl
   in
   loop [ "a"; "b"; "c"; "x"; "y"; "z"; "0"; "1"; "2" ]
+
+(* Magic number check. *)
+let () =
+  match Cdict.of_string "foo" with
+  | exception Failure "Not a dictionary" -> ()
+  | _ -> assert false
+
+(* Version check. *)
+let () =
+  match Cdict.of_string "Dic\xFF" with
+  | exception Failure "Unsupported format" -> ()
+  | _ -> assert false

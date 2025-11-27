@@ -71,7 +71,15 @@ JNIEXPORT jlong JNICALL Java_juloo_cdict_Cdict_of_1bytes_1native
   void *dict = malloc(sizeof(cdict_t) + len);
   void *dict_data = dict + sizeof(cdict_t);
   (*env)->GetByteArrayRegion(env, data, 0, len, dict_data);
-  *(cdict_t*)dict = cdict_of_string(dict_data, len);
+  cdict_cnstr_result_t r = cdict_of_string(dict_data, len, (cdict_t*)dict);
+  if (r != CDICT_OK)
+  {
+    free(dict);
+    (*env)->ThrowNew(env,
+        (*env)->FindClass(env, "juloo/cdict/Cdict$ConstructionError"),
+        cdict_cnstr_result_to_string(r));
+    return 0;
+  }
   return (jlong)dict;
 }
 

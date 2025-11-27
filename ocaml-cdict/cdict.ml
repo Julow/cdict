@@ -14,7 +14,8 @@ type result = {
 
 external of_string : string -> t = "cdict_of_string_ocaml"
 (** Load a dictionary stored in a string. Use the library [cdict.builder] to
-    construct this dictionary. *)
+    construct this dictionary. Raises [Failure] if the dictionary seems
+    corrupted. *)
 
 external find : t -> string -> result = "cdict_find_ocaml"
 (** Lookup a word in the dictionary. *)

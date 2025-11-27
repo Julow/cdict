@@ -21,11 +21,13 @@ static void end()
 #define SIZE(TYPE) P_LINE("let %s = %d", #TYPE, (int)sizeof(TYPE))
 #define VAL(PREFIX, VAL) P_LINE("let %s = %d", #PREFIX #VAL, (int)VAL)
 #define VAL_INT32(PREFIX, VAL) P_LINE("let %s = %dl", #PREFIX #VAL, (int32_t)VAL)
+#define VAL_STR(PREFIX, VAL) P_LINE("let %s = \"%s\"", #PREFIX #VAL, VAL)
 
 int main()
 {
   module("C");
 
+  VAL(c_, FORMAT_VERSION);
   VAL(c_, FORMAT_8_BITS);
   VAL(c_, FORMAT_16_BITS);
   VAL(c_, FORMAT_24_BITS);
@@ -33,6 +35,7 @@ int main()
   VAL(c_, PREFIX_MAX_LENGTH);
   VAL(c_, BRANCHES_BRANCHES_FORMAT_OFFSET);
   VAL(c_, BRANCHES_NUMBERS_FORMAT_OFFSET);
+  VAL_STR(c_, HEADER_MAGIC);
   VAL(mask_, PTR_KIND_MASK);
   VAL(mask_, PTR_FLAGS_MASK);
   VAL(mask_, PTR_OFFSET_MASK);
@@ -49,6 +52,8 @@ int main()
   FIELD(prefix_t, next_ptr);
   FIELD(prefix_t, length);
   FIELD(prefix_t, prefix);
+  FIELD(header_t, magic);
+  FIELD(header_t, version);
   FIELD(header_t, root_ptr);
   FIELD(header_t, freq_off);
 

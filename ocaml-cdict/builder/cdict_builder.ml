@@ -306,8 +306,10 @@ module Writer = struct
     let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     let root_ptr = Ptr.encode ~node_off:0 root_ptr in
-    w_int32 b header_off O.header_t_root_ptr (Int32.of_int root_ptr);
     let freq_off = alloc b (Freq.size freq) in
+    w_str b header_off O.header_t_magic C.c_HEADER_MAGIC;
+    w_uint8 b header_off O.header_t_version C.c_FORMAT_VERSION;
+    w_int32 b header_off O.header_t_root_ptr (Int32.of_int root_ptr);
     w_int32 b header_off O.header_t_freq_off (Int32.of_int freq_off);
     w_str b freq_off 0 (freq :> string)
 end

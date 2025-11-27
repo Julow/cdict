@@ -20,7 +20,7 @@ public class Cdict
 
   /** Load a dictionary stored in a string. The data is copied and not modified.
       Use [cdict-tool] to construct the dictionary. */
-  public static Cdict of_bytes(byte[] data)
+  public static Cdict of_bytes(byte[] data) throws ConstructionError
   { return new Cdict(of_bytes_native(data)); }
 
   /** Check whether the given word is recognized by the dictionary. Never
@@ -55,6 +55,12 @@ public class Cdict
       [count] elements but might be smaller. */
   public int[] distance(String word, int distance, int count)
   { return distance_native(ptr, word, distance, count); }
+
+  /** Thrown during construction. */
+  public class ConstructionError extends Exception
+  {
+    public ConstructionError(String msg) { super(msg); }
+  }
 
   /** Internals */
 

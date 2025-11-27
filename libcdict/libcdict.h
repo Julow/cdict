@@ -17,9 +17,23 @@ typedef struct
   uint8_t const *freq;
 } cdict_t;
 
+/** Returned by [cdict_of_string]. */
+typedef enum
+{
+  CDICT_OK, // The dictionary was succesfully loaded
+  CDICT_NOT_A_DICTIONARY, // File is not a dictionary
+  CDICT_UNSUPPORTED_FORMAT,
+  // Dictionary was created for an incompatible version of the library
+} cdict_cnstr_result_t;
+
 /** Create a in-memory dictionary from a string of a given size. The string is
-    not copied and must remain valid until the dictionary stops being used. */
-cdict_t cdict_of_string(char const *data, int size);
+    not copied and must remain valid until the dictionary stops being used.
+    Write into [dst]. Returns [CDICT_OK] on success or an error code if the
+    dictionary seems corrupted. */
+cdict_cnstr_result_t cdict_of_string(char const *data, int size, cdict_t *dst);
+
+/** Text description of an error for use in exceptions and logs. */
+char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r);
 
 /** Return value of [cdict_find]. */
 typedef struct

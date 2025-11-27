@@ -1,8 +1,10 @@
 #include <caml/alloc.h>
-#include <caml/memory.h>
 #include <caml/custom.h>
-#include <string.h>
+#include <caml/fail.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
 #include <libcdict.h>
+#include <string.h>
 
 #define CDICT_VAL(v) ((cdict_t*)Data_custom_val(v))
 
@@ -40,15 +42,17 @@ static void result_of_value(value v, cdict_result_t *dst)
 value cdict_of_string_ocaml(value str)
 {
   CAMLparam1(str);
-  CAMLlocal1(r);
+  CAMLlocal1(dict);
   // We must copy the string to ensure that it doesn't move during GC.
   // The string is copied into the same custom block, after the cdict_t struct.
   int s_len = caml_string_length(str);
-  r = caml_alloc_custom_mem(&cdict_t_ops, sizeof(cdict_t) + s_len, 0);
-  void *data = ((void*)Data_custom_val(r)) + sizeof(cdict_t);
+  dict = caml_alloc_custom_mem(&cdict_t_ops, sizeof(cdict_t) + s_len, 0);
+  void *data = ((void*)Data_custom_val(dict)) + sizeof(cdict_t);
   memcpy(data, String_val(str), s_len);
-  *CDICT_VAL(r) = cdict_of_string(data, s_len);
-  CAMLreturn(r);
+  cdict_cnstr_result_t r = cdict_of_string(data, s_len, CDICT_VAL(dict));
+  if (r != CDICT_OK)
+    caml_failwith(cdict_cnstr_result_to_string(r));
+  CAMLreturn(dict);
 }
 
 value cdict_find_ocaml(value dict, value str)

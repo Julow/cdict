@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static inline int decode_int24(uint8_t const *ar)
 {
@@ -22,18 +23,33 @@ static inline int min(int a, int b) { return (a < b) ? a : b; }
     cdict_of_string
     ************************************************************************ */
 
-cdict_t cdict_of_string(char const *data, int size)
+cdict_cnstr_result_t cdict_of_string(char const *data, int size, cdict_t *dst)
 {
   header_t const *h = (void const*)data;
+  if (memcmp(h->magic, HEADER_MAGIC, sizeof(h->magic)) != 0)
+    return CDICT_NOT_A_DICTIONARY;
+  if (h->version != FORMAT_VERSION)
+    return CDICT_UNSUPPORTED_FORMAT;
   int root_ptr = decode_int32(h->root_ptr);
   int freq_off = decode_int32(h->freq_off);
-  cdict_t dict = {
+  *dst = (cdict_t){
     .data = data,
     .size = size,
     .root_ptr = root_ptr,
     .freq = (uint8_t const*)(data + freq_off)
   };
-  return dict;
+  return CDICT_OK;
+}
+
+char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r)
+{
+  switch (r)
+  {
+    case CDICT_OK: return "OK";
+    case CDICT_NOT_A_DICTIONARY: return "Not a dictionary";
+    case CDICT_UNSUPPORTED_FORMAT: return "Unsupported format";
+  }
+  return "";
 }
 
 /** ************************************************************************
