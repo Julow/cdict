@@ -88,14 +88,14 @@ static void find_ends(void const *parent_node, int ptr, int index, bool found,
   void const *node = PTR_NODE(ptr, parent_node);
   result->found = found && (bool)PTR_IS_FINAL(ptr);
   result->index = index;
-  result->prefix_ptr = PREFIX_PTR(node, ptr);
+  result->prefix_ptr = PREFIX_PTR(node);
 }
 
 static void cdict_find_prefix(prefix_t const *node,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
   char const *prefix = node->prefix;
-  char const *prefix_end = prefix + node->length;
+  char const *prefix_end = prefix + PREFIX_LENGTH(node);
   int next_ptr = decode_int24(node->next_ptr);
   while (true)
   {
@@ -115,7 +115,7 @@ static void cdict_find_node(void const *parent_node, int ptr,
   if (PTR_IS_FINAL(ptr))
     index++;
   void const *node = PTR_NODE(ptr, parent_node);
-  switch (PTR_KIND(ptr))
+  switch (NODE_KIND(node))
   {
     case BRANCHES:
       return cdict_find_branches(node, word, end, index, result);
@@ -183,7 +183,7 @@ static int cdict_word_branches(branches_t const *b, int index,
 static int cdict_word_prefix(prefix_t const *p, int index,
     char *dst, int dsti, int max_len)
 {
-  int end = dsti + p->length;
+  int end = dsti + PREFIX_LENGTH(p);
   char const *prefix = p->prefix;
   if (end > max_len)
     end = max_len;
@@ -204,7 +204,7 @@ static int cdict_word_node(void const *parent_node, int ptr, int index,
       return dsti;
     index--;
   }
-  switch (PTR_KIND(ptr))
+  switch (NODE_KIND(node))
   {
     case BRANCHES: return cdict_word_branches(node, index, dst, dsti, max_len);
     case PREFIX: return cdict_word_prefix(node, index, dst, dsti, max_len);
@@ -336,7 +336,7 @@ static void suffixes(cdict_t const *dict, void const *parent_node, int ptr,
     priority_add(dst, cdict_freq(dict, index), index);
     index++;
   }
-  switch (PTR_KIND(ptr))
+  switch (NODE_KIND(node))
   {
     case BRANCHES:
       suffixes_branches(dict, node, index, dst);
@@ -356,8 +356,7 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
   word_freq_t words[count];
   priority_t queue;
   priority_init(&queue, words, count);
-  suffixes(dict, PREFIX_PTR_NODE(r->prefix_ptr), PREFIX_PTR_PTR(r->prefix_ptr),
-      r->index, &queue);
+  suffixes(dict, PREFIX_PTR_NODE(r->prefix_ptr), 0, r->index, &queue);
   return priority_to_sorted_array(&queue, dst, count);
 }
 
@@ -420,7 +419,7 @@ static int levenshtein_distance(char const *a, int a_length,
 static void distance_prefix(cdict_t const *dict, prefix_t const *p,
     char const *word, char const *end, int index, int dist, priority_t *q)
 {
-  int len = p->length;
+  int len = PREFIX_LENGTH(p);
   int word_len = ((intptr_t)end) - ((intptr_t)word);
   int common_len = min(word_len, len);
   int pdist = levenshtein_distance(word, common_len, p->prefix, common_len);
@@ -459,15 +458,14 @@ static void distance(cdict_t const *dict, void const *parent_node, int ptr,
     // Remove the final flag before calling [suffixes] to avoid returning the
     // queried word and to avoid incrementing [index] twice.
     if (dist == 1)
-      suffixes(dict, node, (ptr & PTR_KIND_MASK), index, q);
+      suffixes(dict, node, 0, index, q);
     return;
   }
-  switch (PTR_KIND(ptr))
+  switch (NODE_KIND(node))
   {
     case BRANCHES:
       // Remove a letter
-      distance(dict, node, (ptr & PTR_KIND_MASK), word + 1, end,
-          index, dist - 1, q);
+      distance(dict, node, 0, word + 1, end, index, dist - 1, q);
       return distance_branches(dict, node, word, end, index, dist, q);
     case PREFIX:
       return distance_prefix(dict, node, word, end, index, dist, q);

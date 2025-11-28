@@ -24,18 +24,20 @@ typedef enum
   PREFIX = 0b1,
 } kind_t;
 
+/** The first byte of nodes contains the node's kind with this mask. */
+#define NODE_KIND_MASK 0b1u
+
+#define NODE_KIND(NODE) (((uint8_t const*)(NODE))[0] & NODE_KIND_MASK)
+
+/** Pointers. */
+
 /** Whether the pointer is a final transition. */
-#define PTR_FLAG_FINAL 0b10
+#define PTR_FLAG_FINAL 0b1
 
-// Kind and flags (2 bits)
-#define PTR_KIND_MASK 0b1u
-#define PTR_FLAGS_MASK PTR_FLAG_FINAL
-
-#define PTR_KIND(PTR) (kind_t)((PTR) & PTR_KIND_MASK)
 #define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
 
 // Offset field
-#define PTR_OFFSET_MASK (~(PTR_KIND_MASK | PTR_FLAGS_MASK))
+#define PTR_OFFSET_MASK (~PTR_FLAG_FINAL)
 
 #define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + (int)((PTR) & PTR_OFFSET_MASK))
 
@@ -88,7 +90,7 @@ Branches are not NULL and there is no padding within the node.
 typedef struct
 {
   uint8_t header;
-  /** Encode the format of the 'branches' and 'numbers' array. */
+  /** Format of the 'branches' and 'numbers' array and node kind. */
   uint8_t length;
   /** Length of the 'labels' and 'branches' arrays. Not the offset to the
       'branches' array. */
@@ -97,8 +99,8 @@ typedef struct
   // uint8_t numbers[]; /** Use [branch_number(b, i)] to access. */
 } branches_t;
 
-#define BRANCHES_BRANCHES_FORMAT_OFFSET 2
-#define BRANCHES_NUMBERS_FORMAT_OFFSET 0
+#define BRANCHES_BRANCHES_FORMAT_OFFSET 3
+#define BRANCHES_NUMBERS_FORMAT_OFFSET 1
 
 #define BRANCHES_BRANCHES_FORMAT(B) \
   ((format_t)(((B)->header >> BRANCHES_BRANCHES_FORMAT_OFFSET) & MAX_FORMAT_T))
@@ -133,12 +135,16 @@ The length cannot be 0.
 
 typedef struct
 {
+  uint8_t header; /** Length and node kind. */
   uint8_t next_ptr[3]; /** 24-bits big-endian signed integer. */
-  uint8_t length;
   char prefix[];
 } prefix_t;
 
-#define PREFIX_MAX_LENGTH 0xFF
+#define PREFIX_MAX_LENGTH 0x7F
+#define PREFIX_LENGTH_OFFSET 1
+
+/** Length of the [prefix] array. */
+#define PREFIX_LENGTH(P) ((P)->header >> PREFIX_LENGTH_OFFSET)
 
 /** Prefix pointer
 
@@ -148,10 +154,8 @@ It is exposed in 'cdict_result_t' but not used outside of the library.
 'prefix_ptr' can be NULL.
 */
 
-#define PREFIX_PTR_NODE(P) ((void const*)((P) & ~(intptr_t)PTR_KIND_MASK))
-#define PREFIX_PTR_PTR(P) ((kind_t)((P) & PTR_KIND_MASK))
-
-#define PREFIX_PTR(NODE, PTR) (((intptr_t)(NODE)) | ((PTR) & PTR_KIND_MASK))
+#define PREFIX_PTR_NODE(P) ((void const*)(P))
+#define PREFIX_PTR(NODE) ((intptr_t)(NODE))
 
 /** Dictionary header (size = 8 bytes)
 

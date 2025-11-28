@@ -189,42 +189,36 @@ module Buf = struct
   include Open
 end
 
-type kind = [ `Prefix | `Branches ]
-
 module Ptr : sig
   type t
 
-  val v : final:bool -> kind -> int -> t
+  val v : final:bool -> int -> t
   val encode : node_off:int -> t -> int
 end = struct
-  type t = { final : bool; kind : kind; address : int }
+  type t = { final : bool; address : int }
 
-  let tag_of_kind = function
-    | `Prefix -> C.tag_PREFIX
-    | `Branches -> C.tag_BRANCHES
+  let v ~final address = { final; address }
 
-  let v ~final kind address = { final; kind; address }
-
-  let encode ~node_off { final; kind; address } =
+  let encode ~node_off { final; address } =
     let final_flag = if final then C.flag_PTR_FLAG_FINAL else 0 in
     (* Offsets are relative *)
     let offset = address - node_off in
     assert (offset land C.mask_PTR_OFFSET_MASK = offset);
-    final_flag lor tag_of_kind kind lor offset
+    final_flag lor offset
 end
 
 module Writer = struct
   open Buf.Open
 
-  let[@inline] align4 offset =
-    let down = offset land lnot 3 in
-    if down = offset then down else down + 4
+  let[@inline] align2 offset =
+    let down = offset land lnot 1 in
+    if down = offset then down else down + 2
 
   module Seen = Optimized.IdMap
 
   let alloc b n =
     let off = b.Buf.end_ in
-    let off = align4 off in
+    let off = align2 off in
     let end_ = off + n in
     b.end_ <- end_;
     let b_len = Bytes.length b.b in
@@ -235,29 +229,29 @@ module Writer = struct
     off
 
   let rec write_node seen b nodes { Optimized.final; next } =
-    let kind, offset =
+    let offset =
       match Seen.find_opt next !seen with
       | Some node -> node
       | None ->
           let node =
             match Optimized.find next nodes with
             (* | exception Not_found -> . *)
-            | Optimized.Prefix (p, tr) ->
-                (`Prefix, write_prefix_node seen b nodes p tr)
-            | Branches brs -> (`Branches, write_branches_node seen b nodes brs)
+            | Optimized.Prefix (p, tr) -> write_prefix_node seen b nodes p tr
+            | Branches brs -> write_branches_node seen b nodes brs
           in
           seen := Seen.add next node !seen;
           node
     in
-    Ptr.v ~final kind offset
+    Ptr.v ~final offset
 
   and write_prefix_node seen b nodes p next =
     let len = String.length p in
     let off = alloc b (S.prefix_t + len) in
     let next_ptr = write_node seen b nodes next in
     let next_ptr = Ptr.encode ~node_off:off next_ptr in
+    let header = (len lsl C.c_PREFIX_LENGTH_OFFSET) lor C.tag_PREFIX in
+    w_uint8 b off O.prefix_t_header header;
     w_int24 b off O.prefix_t_next_ptr next_ptr;
-    w_uint8 b off O.prefix_t_length len;
     w_str b off O.prefix_t_prefix p;
     off
 
@@ -289,6 +283,7 @@ module Writer = struct
     let header =
       (branches_format lsl C.c_BRANCHES_BRANCHES_FORMAT_OFFSET)
       lor (numbers_format lsl C.c_BRANCHES_NUMBERS_FORMAT_OFFSET)
+      lor C.tag_BRANCHES
     in
     let off' = alloc b (numbers_start_off + (length * number_byte_size)) in
     assert (off = off');

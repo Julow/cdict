@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  68K dict
+  60K dict
 
 TODO: Some words are not found back due to some encoding issues.
 

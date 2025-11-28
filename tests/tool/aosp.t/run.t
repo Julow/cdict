@@ -4,7 +4,7 @@
   Done.
 
   $ ls -sh dict
-  68K dict
+  60K dict
 
   $ cdict-tool query dict type module function value match
   found: "type" freq=15 index=7526

@@ -35,9 +35,8 @@ int main()
   VAL(c_, PREFIX_MAX_LENGTH);
   VAL(c_, BRANCHES_BRANCHES_FORMAT_OFFSET);
   VAL(c_, BRANCHES_NUMBERS_FORMAT_OFFSET);
+  VAL(c_, PREFIX_LENGTH_OFFSET);
   VAL_STR(c_, HEADER_MAGIC);
-  VAL(mask_, PTR_KIND_MASK);
-  VAL(mask_, PTR_FLAGS_MASK);
   VAL(mask_, PTR_OFFSET_MASK);
   VAL(flag_, PTR_FLAG_FINAL);
   VAL(tag_, BRANCHES);
@@ -50,7 +49,7 @@ int main()
   FIELD(branches_t, length);
   FIELD(branches_t, labels);
   FIELD(prefix_t, next_ptr);
-  FIELD(prefix_t, length);
+  FIELD(prefix_t, header);
   FIELD(prefix_t, prefix);
   FIELD(header_t, magic);
   FIELD(header_t, version);
