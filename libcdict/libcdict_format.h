@@ -26,6 +26,7 @@ typedef enum
 
 /** The first byte of nodes contains the node's kind with this mask. */
 #define NODE_KIND_MASK 0b1u
+#define NODE_KIND_BIT_LENGTH 1
 
 #define NODE_KIND(NODE) (((uint8_t const*)(NODE))[0] & NODE_KIND_MASK)
 
@@ -33,13 +34,11 @@ typedef enum
 
 /** Whether the pointer is a final transition. */
 #define PTR_FLAG_FINAL 0b1
-
-#define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
-
-// Offset field
 #define PTR_OFFSET_MASK (~PTR_FLAG_FINAL)
 
-#define PTR_NODE(PTR, PARENT_NODE) (((void const*)(PARENT_NODE)) + (int)((PTR) & PTR_OFFSET_MASK))
+#define PTR_IS_FINAL(PTR) (bool)((PTR) & PTR_FLAG_FINAL)
+#define PTR_NODE(PTR, PARENT_NODE) \
+  (((void const*)(PARENT_NODE)) + (((int)(PTR)) & PTR_OFFSET_MASK))
 
 /** Sized integer arrays. */
 
@@ -54,6 +53,7 @@ typedef enum
 
 /** Mask masking every values of [format_t]. */
 #define MAX_FORMAT_T 0b111
+#define FORMAT_T_BIT_LENGTH 3
 
 /** Size of an array of N elements with format F. */
 #define FORMAT_ARRAY_INDEX(F, I) (((F) * (I)) >> 1)
@@ -88,7 +88,8 @@ static inline int sized_int_array_signed(uint8_t const *ar, format_t fmt, int i)
   return (int)(((int8_t)ar0 << 16) | (ar[1] << 8) | ar[2]);
 }
 
-/** BRANCHES nodes (size = 4 bytes + array)
+/** BRANCHES nodes (size = 2 bytes + (1 + X + Y) * n_branches)
+where X and Y can be 0.5, 1, 2 or 3.
 
 A branching node that consumes 1 byte from the query. The branch labels are
 stored in a binary search tree.
@@ -110,8 +111,9 @@ typedef struct
   // uint8_t numbers[]; /** Use [branch_number(b, i)] to access. */
 } branches_t;
 
-#define BRANCHES_BRANCHES_FORMAT_OFFSET 4
-#define BRANCHES_NUMBERS_FORMAT_OFFSET 1
+#define BRANCHES_BRANCHES_FORMAT_OFFSET NODE_KIND_BIT_LENGTH
+#define BRANCHES_NUMBERS_FORMAT_OFFSET \
+  (BRANCHES_BRANCHES_FORMAT_OFFSET + FORMAT_T_BIT_LENGTH)
 
 #define BRANCHES_BRANCHES_FORMAT(B) \
   ((format_t)(((B)->header >> BRANCHES_BRANCHES_FORMAT_OFFSET) & MAX_FORMAT_T))
@@ -137,13 +139,11 @@ typedef struct
   return sized_int_array_unsigned(ar, BRANCHES_NUMBERS_FORMAT(b), i);
 }
 
-/** PREFIX nodes (size = 8 bytes)
+/** PREFIX nodes (size = 4 bytes + prefix length)
 
-A single branch, consuming a prefix of the query.
-The 'next' field contains the pointer to the next node and the length of the
-'prefix' array. The number field is used to store the length. The pointer is
-considered to have a number field equal to 0.
-
+A node consuming a prefix of the query, which can have a size from 1 to
+PREFIX_MAX_LENGTH.
+The node contains a single transition that have the 'number' field equal to 0.
 The length cannot be 0.
 */
 
@@ -154,8 +154,8 @@ typedef struct
   char prefix[];
 } prefix_t;
 
-#define PREFIX_MAX_LENGTH 0x7F
-#define PREFIX_LENGTH_OFFSET 1
+#define PREFIX_LENGTH_OFFSET NODE_KIND_BIT_LENGTH
+#define PREFIX_MAX_LENGTH ((int)(uint8_t)(0xFFu << PREFIX_LENGTH_OFFSET))
 
 /** Length of the [prefix] array. */
 #define PREFIX_LENGTH(P) ((P)->header >> PREFIX_LENGTH_OFFSET)
