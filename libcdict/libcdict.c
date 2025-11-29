@@ -52,6 +52,8 @@ char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r)
   return "";
 }
 
+int cdict_format_version() { return FORMAT_VERSION; }
+
 /** ************************************************************************
     cdict_find
     ************************************************************************ */

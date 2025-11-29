@@ -39,3 +39,7 @@ external distance : t -> string -> dist:int -> count:int -> index array
     have a distance less than [dist]. The [count] most frequent words are
     returned. The returned array cannot contain more than [count] elements but
     might be smaller. *)
+
+external format_version : unit -> int = "cdict_format_version_ocaml"
+(** Version of the dictionary's format. Dictionaries built for a different
+    version are not compatible. *)

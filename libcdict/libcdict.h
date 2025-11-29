@@ -74,3 +74,7 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
     contain more than [count] elements but might be smaller. */
 int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
     int *dst, int count);
+
+/** Version of the dictionary's format. Dictionaries built for a different
+    version are not compatible. */
+int cdict_format_version();

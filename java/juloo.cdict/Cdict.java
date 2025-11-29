@@ -56,6 +56,10 @@ public class Cdict
   public int[] distance(String word, int distance, int count)
   { return distance_native(ptr, word, distance, count); }
 
+  /** Version of the dictionary's format. Dictionaries built for a different
+      version are not compatible. */
+  public static native int format_version();
+
   /** Thrown during construction. */
   public class ConstructionError extends Exception
   {

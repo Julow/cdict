@@ -9,6 +9,14 @@ extern "C" {
 #endif
 /*
  * Class:     juloo_cdict_Cdict
+ * Method:    format_version
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_juloo_cdict_Cdict_format_1version
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     juloo_cdict_Cdict
  * Method:    init
  * Signature: ()V
  */

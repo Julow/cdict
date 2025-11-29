@@ -55,6 +55,12 @@ value cdict_of_string_ocaml(value str)
   CAMLreturn(dict);
 }
 
+value cdict_format_version_ocaml(value _unit)
+{
+  (void)_unit;
+  return Val_int(cdict_format_version());
+}
+
 value cdict_find_ocaml(value dict, value str)
 {
   CAMLparam2(dict, str);

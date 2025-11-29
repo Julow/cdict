@@ -53,6 +53,12 @@ static jarray jarray_of_int_array(JNIEnv *env, int const *src, int len)
 
 /** Methods */
 
+JNIEXPORT jint JNICALL Java_juloo_cdict_Cdict_format_version(JNIEnv *env,
+    jclass jcls)
+{
+  return cdict_format_version();
+}
+
 JNIEXPORT void JNICALL Java_juloo_cdict_Cdict_init(JNIEnv *env, jclass jcls)
 {
   Result.class =
