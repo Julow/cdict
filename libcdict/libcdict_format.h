@@ -43,27 +43,34 @@ typedef enum
 
 /** Sized integer arrays. */
 
-/** Format of integer arrays. All formats are big-endians. This is also the
-    size in bytes of each element. */
+/** Format of integer arrays. All formats are big-endians. */
 typedef enum
 {
-  FORMAT_8_BITS = 1,
-  FORMAT_16_BITS = 2,
-  FORMAT_24_BITS = 3,
+  FORMAT_4_BITS = 1,
+  FORMAT_8_BITS = 2,
+  FORMAT_16_BITS = 4,
+  FORMAT_24_BITS = 6,
 } format_t;
 
 /** Mask masking every values of [format_t]. */
-#define MAX_FORMAT_T 0b11
+#define MAX_FORMAT_T 0b111
+
+/** Size of an array of N elements with format F. */
+#define FORMAT_ARRAY_INDEX(F, I) (((F) * (I)) >> 1)
+#define FORMAT_ARRAY_SIZE(F, N) (((F) * (N) + 1) >> 1)
 
 /** Access the [i]th unsigned integer in array [ar] of format [fmt]. */
 static inline int sized_int_array_unsigned(uint8_t const *ar, format_t fmt, int i)
 {
   if (fmt == FORMAT_8_BITS)
     return ar[i];
-  ar = ar + fmt * i;
+  ar = ar + FORMAT_ARRAY_INDEX(fmt, i);
+  uint8_t ar0 = ar[0];
+  if (fmt == FORMAT_4_BITS)
+    return (i & 1) ? ar0 >> 4 : ar0 & 0xF;
   if (fmt == FORMAT_16_BITS)
-    return ((ar[0] << 8) | ar[1]);
-  return (int)(unsigned)((ar[0] << 16) | (ar[1] << 8) | ar[2]);
+    return ((ar0 << 8) | ar[1]);
+  return (int)(unsigned)((ar0 << 16) | (ar[1] << 8) | ar[2]);
 }
 
 /** Access the [i]th unsigned integer in array [ar] of format [fmt]. */
@@ -71,10 +78,14 @@ static inline int sized_int_array_signed(uint8_t const *ar, format_t fmt, int i)
 {
   if (fmt == FORMAT_8_BITS)
     return (int)(int8_t)ar[i];
-  ar = ar + fmt * i;
+  ar = ar + FORMAT_ARRAY_INDEX(fmt, i);
+  uint8_t ar0 = ar[0];
+  if (fmt == FORMAT_4_BITS)
+    return (i & 1) ? ((int8_t)ar0) >> 4 :
+      (ar0 & 0x8) ? 0xF0 | ar0 : ar0 & 0xF;
   if (fmt == FORMAT_16_BITS)
-    return (((int)((int8_t)ar[0]) << 8) | ar[1]);
-  return (int)(((int8_t)ar[0] << 16) | (ar[1] << 8) | ar[2]);
+    return ((int)((int8_t)ar0 << 8) | ar[1]);
+  return (int)(((int8_t)ar0 << 16) | (ar[1] << 8) | ar[2]);
 }
 
 /** BRANCHES nodes (size = 4 bytes + array)
@@ -99,7 +110,7 @@ typedef struct
   // uint8_t numbers[]; /** Use [branch_number(b, i)] to access. */
 } branches_t;
 
-#define BRANCHES_BRANCHES_FORMAT_OFFSET 3
+#define BRANCHES_BRANCHES_FORMAT_OFFSET 4
 #define BRANCHES_NUMBERS_FORMAT_OFFSET 1
 
 #define BRANCHES_BRANCHES_FORMAT(B) \
@@ -109,17 +120,20 @@ typedef struct
   ((format_t)(((B)->header >> BRANCHES_NUMBERS_FORMAT_OFFSET) & MAX_FORMAT_T))
 
 /** Access a branch. */
-static inline int branch(branches_t const *b, int i)
+// TODO: Using 'inline' make the program crash
+[[maybe_unused]] static int branch(branches_t const *b, int i)
 {
+  format_t fmt = BRANCHES_BRANCHES_FORMAT(b);
   uint8_t const *ar = ((void const*)b) + (sizeof(branches_t) + b->length);
-  return sized_int_array_signed(ar, BRANCHES_BRANCHES_FORMAT(b), i);
+  return sized_int_array_signed(ar, fmt, i);
 }
 
 /** Access a number. */
-static inline unsigned int branch_number(branches_t const *b, int i)
+[[maybe_unused]] static unsigned int branch_number(branches_t const *b, int i)
 {
-  uint8_t const *ar = ((void const*)b) +
-    (sizeof(branches_t) + b->length * (BRANCHES_BRANCHES_FORMAT(b) + 1));
+  format_t branches_fmt = BRANCHES_BRANCHES_FORMAT(b);
+  uint8_t const *ar = ((void const*)b) + (sizeof(branches_t) + b->length +
+     FORMAT_ARRAY_SIZE(branches_fmt, b->length));
   return sized_int_array_unsigned(ar, BRANCHES_NUMBERS_FORMAT(b), i);
 }
 

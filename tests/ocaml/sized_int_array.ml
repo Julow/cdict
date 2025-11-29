@@ -21,34 +21,42 @@ let create_and_assert format ?expect ar =
 
 let () =
   let t = create_detect_and_assert [| 0; 1; 2; 4; 5; 6 |] in
-  assert (fst t = U8)
+  assert (S.size t = 3);
+  assert (fst t = U4)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; 2; 4; 5; -1; 6 |] in
-  assert (fst t = I8)
+  assert (S.size t = 4);
+  assert (fst t = I4)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; 2; 4; 255 |] in
+  assert (S.size t = 5);
   assert (fst t = U8)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; -1; 2; 4; 127 |] in
+  assert (S.size t = 6);
   assert (fst t = I8)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; -1; 2; 4; -128 |] in
+  assert (S.size t = 6);
   assert (fst t = I8)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; -1; 2; 4; 128 |] in
+  assert (S.size t = 6 * 2);
   assert (fst t = I16)
 
 let () =
   let t = create_detect_and_assert [| 0; 1; -1; 2; 4; -129 |] in
+  assert (S.size t = 6 * 2);
   assert (fst t = I16)
 
 let () =
   let t = create_detect_and_assert ~signed:true [| 0; 1; 2; 4; 128 |] in
+  assert (S.size t = 5 * 2);
   assert (fst t = I16)
 
 let () =
@@ -61,17 +69,19 @@ let () =
 (** 24-bits integers *)
 
 let () =
-  let _ =
+  let t =
     create_and_assert S.U24
       ~expect:[| 1; 2; 0xFF; 0xFFFF; 0xFFFFFF; 0xFFFFFF - 2 |]
       [| 1; 2; 0xFF; 0xFFFF; 0xFFFFFF; -3 |]
   in
+  assert (S.size t = 6 * 3);
   ()
 
 let () =
-  let _ =
+  let t =
     create_and_assert S.I24
       ~expect:[| 1; 2; 0xFF; 0xFFFF; -1; -3 |]
       [| 1; 2; 0xFF; 0xFFFF; 0xFFFFFF; -3 |]
   in
+  assert (S.size t = 6 * 3);
   ()

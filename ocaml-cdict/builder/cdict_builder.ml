@@ -228,6 +228,13 @@ module Writer = struct
       b.b <- newb);
     off
 
+  let format_t_of_array ar =
+    match Sized_int_array.format ar with
+    | I4 | U4 -> C.c_FORMAT_4_BITS
+    | I8 | U8 -> C.c_FORMAT_8_BITS
+    | I16 | U16 -> C.c_FORMAT_16_BITS
+    | I24 | U24 -> C.c_FORMAT_24_BITS
+
   let rec write_node seen b nodes { Optimized.final; next } =
     let offset =
       match Seen.find_opt next !seen with
@@ -261,37 +268,25 @@ module Writer = struct
     let branches = Array.map (fun tr -> write_node seen b nodes tr) branches in
     let off = alloc b 0 in
     let branches = Array.map (Ptr.encode ~node_off:off) branches in
+    let branches = Sized_int_array.mk_detect ~signed:true branches in
+    let numbers = Sized_int_array.mk_detect ~signed:false numbers in
     let length = String.length labels in
     let branches_start_off = S.branches_t + length in
-    let branch_byte_size, branches_format, branches_encoded =
-      let format, ar = Sized_int_array.mk_detect ~signed:true branches in
-      match format with
-      | I8 -> (1, C.c_FORMAT_8_BITS, ar)
-      | I16 -> (2, C.c_FORMAT_16_BITS, ar)
-      | I24 -> (3, C.c_FORMAT_24_BITS, ar)
-      | _ -> assert false
-    in
-    let numbers_start_off = branches_start_off + (length * branch_byte_size) in
-    let number_byte_size, numbers_format, numbers_encoded =
-      let format, ar = Sized_int_array.mk_detect ~signed:false numbers in
-      match format with
-      | U8 -> (1, C.c_FORMAT_8_BITS, ar)
-      | U16 -> (2, C.c_FORMAT_16_BITS, ar)
-      | U24 -> (3, C.c_FORMAT_24_BITS, ar)
-      | _ -> assert false
+    let numbers_start_off =
+      branches_start_off + Sized_int_array.size branches
     in
     let header =
-      (branches_format lsl C.c_BRANCHES_BRANCHES_FORMAT_OFFSET)
-      lor (numbers_format lsl C.c_BRANCHES_NUMBERS_FORMAT_OFFSET)
+      (format_t_of_array branches lsl C.c_BRANCHES_BRANCHES_FORMAT_OFFSET)
+      lor (format_t_of_array numbers lsl C.c_BRANCHES_NUMBERS_FORMAT_OFFSET)
       lor C.tag_BRANCHES
     in
-    let off' = alloc b (numbers_start_off + (length * number_byte_size)) in
+    let off' = alloc b (numbers_start_off + Sized_int_array.size numbers) in
     assert (off = off');
     w_uint8 b off O.branches_t_header header;
     w_uint8 b off O.branches_t_length length;
     w_str b off O.branches_t_labels labels;
-    w_bytes b off branches_start_off branches_encoded;
-    w_bytes b off numbers_start_off numbers_encoded;
+    w_bytes b off branches_start_off (snd branches);
+    w_bytes b off numbers_start_off (snd numbers);
     off
 
   let write_tree b ((nodes, root_id), freq) =

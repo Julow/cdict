@@ -28,6 +28,7 @@ int main()
   module("C");
 
   VAL(c_, FORMAT_VERSION);
+  VAL(c_, FORMAT_4_BITS);
   VAL(c_, FORMAT_8_BITS);
   VAL(c_, FORMAT_16_BITS);
   VAL(c_, FORMAT_24_BITS);

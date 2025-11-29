@@ -149,7 +149,7 @@ Stats:
     | 25: 1    | 26: 1    | 27: 1    | 68: 1    |
     Transitions: 7597
       | Final: 2081 | Non-final: 5516 |
-    With numbers format: | U16: 13   | U8: 2249 |
+    With numbers format: | U16: 13   | U4: 2044 | U8: 205  |
   Prefix nodes: 2523
     Followed by:
     | Branches: 2116 | Prefix: 407  |

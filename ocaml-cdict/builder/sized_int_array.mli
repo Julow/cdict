@@ -1,7 +1,11 @@
-(** Represent an array of integer of 8, 16 or 24 bits encoded in big-endian. *)
+(** Represent an array of integer of 4, 8, 16 or 24 bits encoded in big-endian.
+
+    In 4bits integers array, integers at pair indices are stored in the least
+    significant bits and the integers at impair indices in the most significant
+    bits. *)
 
 (** Specifies the size and signedness of the integers encoded in the array. *)
-type format = I8 | I16 | I24 | U8 | U16 | U24
+type format = I4 | I8 | I16 | I24 | U4 | U8 | U16 | U24
 
 type t = format * bytes
 
@@ -24,6 +28,11 @@ val get : t -> int -> int
 val set : t -> int -> int -> unit
 (** [set t i v] sets the [i]th integer in the array [t] to [v]. The value of [v]
     is truncated if it doesn't fit the array's format. *)
+
+val format : t -> format
+
+val size : t -> int
+(** Size of the array in bytes. *)
 
 val format_to_string : format -> string
 val detect_format : ?signed:bool -> int array -> format
