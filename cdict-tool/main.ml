@@ -55,9 +55,15 @@ let cmd_stats =
   let doc = "Build a dictionary and print stats about its structure." in
   Cmd.(v (info "stats" ~doc)) term
 
+let cmd_format_version =
+  let run () = Printf.printf "%d\n%!" (Cdict.format_version ()) in
+  let term = Term.(const run $ const ()) in
+  let doc = "Print the version of the dictionary format." in
+  Cmd.(v (info "format-version" ~doc)) term
+
 let cmd =
   let doc = "Build dictionaries from libcdict." in
   let info = Cmd.info "cdict-tool" ~version:"%%VERSION%%" ~doc in
-  Cmd.group info [ cmd_build; cmd_query; cmd_stats ]
+  Cmd.group info [ cmd_build; cmd_query; cmd_stats; cmd_format_version ]
 
 let () = exit (Cmd.eval cmd)
