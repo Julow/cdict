@@ -82,7 +82,7 @@ static inline int sized_int_array_signed(uint8_t const *ar, format_t fmt, int i)
   uint8_t ar0 = ar[0];
   if (fmt == FORMAT_4_BITS)
     return (i & 1) ? ((int8_t)ar0) >> 4 :
-      (ar0 & 0x8) ? 0xF0 | ar0 : ar0 & 0xF;
+      (ar0 & 0x8) ? (int)ar0 | ~0xF : ar0 & 0x7;
   if (fmt == FORMAT_16_BITS)
     return ((int)((int8_t)ar0 << 8) | ar[1]);
   return (int)(((int8_t)ar0 << 16) | (ar[1] << 8) | ar[2]);
