@@ -11,13 +11,21 @@
 
 typedef struct
 {
-  void const *data;
-  size_t size;
-  int32_t root_ptr;
+  char const *name;
+  void const *root_node;
   uint8_t const *freq;
 } cdict_t;
 
-/** Returned by [cdict_of_string]. */
+/** Dictionary files can contain several dictionaries. */
+typedef struct
+{
+  cdict_t const *dicts;
+  /** The dictionary file can contain several dictionaries. The main dictionary
+      is called "main". */
+  int n_dicts; /** Length of the [names] and [dicts] array. */
+  int total_size; /** Total size in bytes. */
+} cdict_header_t;
+
 typedef enum
 {
   CDICT_OK, // The dictionary was succesfully loaded
@@ -27,10 +35,11 @@ typedef enum
 } cdict_cnstr_result_t;
 
 /** Create a in-memory dictionary from a string of a given size. The string is
-    not copied and must remain valid until the dictionary stops being used.
-    Write into [dst]. Returns [CDICT_OK] on success or an error code if the
-    dictionary seems corrupted. */
-cdict_cnstr_result_t cdict_of_string(char const *data, int size, cdict_t *dst);
+    copied. Allocate a single slot in memory and write a pointer to it into
+    [dst]. Free using [free]. Returns [CDICT_OK] on success or an error code if
+    the dictionary seems corrupted. */
+cdict_cnstr_result_t cdict_of_string(char const *data, int size,
+    cdict_header_t const **dst);
 
 /** Text description of an error for use in exceptions and logs. */
 char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r);

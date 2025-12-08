@@ -5,12 +5,14 @@ type 'a t
     metadata attached. This stores the entire dictionary in memory, in a
     space-inefficient way. *)
 
-val of_list : freq:('a -> int) -> (string * 'a) list -> 'a t
+val of_list : name:string -> freq:('a -> int) -> (string * 'a) list -> 'a t
 (** Construct a dictionary from a list. *)
 
-val output : 'a t -> Out_channel.t -> unit
+val output : 'a t list -> Out_channel.t -> unit
+(** Write a dictionary file containing a list of dictionaries into the given
+    channel. *)
 
-val to_string : 'a t -> string
+val to_string : 'a t list -> string
 (** Like [output] but write into a string in memory. *)
 
 val stats : Format.formatter -> 'a t -> unit

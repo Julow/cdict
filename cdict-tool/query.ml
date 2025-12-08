@@ -1,6 +1,8 @@
 let open_dict fname =
   let data = In_channel.(with_open_bin fname input_all) in
-  Cdict.of_string data
+  match Array.find_opt (fun (n, _) -> n = "main") (Cdict.of_string data) with
+  | Some (_, d) -> d
+  | None -> assert false
 
 let queries_from_file = function
   | Some fname -> In_channel.(with_open_text fname input_lines)

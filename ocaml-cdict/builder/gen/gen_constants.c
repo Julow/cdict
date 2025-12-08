@@ -54,8 +54,11 @@ int main()
   FIELD(prefix_t, prefix);
   FIELD(header_t, magic);
   FIELD(header_t, version);
-  FIELD(header_t, root_ptr);
-  FIELD(header_t, freq_off);
+  FIELD(header_t, dict_count);
+  FIELD(header_t, dicts);
+  FIELD(dict_header_t, name_off);
+  FIELD(dict_header_t, root_ptr);
+  FIELD(dict_header_t, freq_off);
 
   end();
   module("S");
@@ -63,6 +66,7 @@ int main()
   SIZE(branches_t);
   SIZE(prefix_t);
   SIZE(header_t);
+  SIZE(dict_header_t);
 
   end();
   return 0;

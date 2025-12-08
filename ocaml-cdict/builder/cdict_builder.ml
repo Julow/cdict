@@ -150,16 +150,17 @@ end = struct
   let to_int_list t = List.init (size t * 2) (get t)
 end
 
-type 'a t = Optimized.t * Freq.t
+type 'a t = { name : string; dfa : Optimized.t; freq : Freq.t }
 
-let of_list ~freq words =
+let of_list ~name ~freq words =
   let words = Array.of_list words in
   Array.sort (fun (a, _) (b, _) -> String.compare a b) words;
   let dfa =
     Dfa.of_sorted_iter (fun f -> Array.iter (fun (w, _) -> f w) words)
+    |> Optimized.of_dfa
   in
   let freq = Freq.of_int_array (Array.map (fun (_, data) -> freq data) words) in
-  (Optimized.of_dfa dfa, freq)
+  { name; dfa; freq }
 
 module Buf = struct
   type t = { mutable b : bytes; mutable end_ : int }
@@ -289,28 +290,39 @@ module Writer = struct
     w_bytes b off numbers_start_off (snd numbers);
     off
 
-  let write_tree b ((nodes, root_id), freq) =
+  (** Write [dict_header_t] fields to [dheader_off]. *)
+  let write_tree b dheader_off { name; dfa = nodes, root_id; freq } =
     let seen = ref Seen.empty in
-    let header_off = alloc b S.header_t in
-    assert (header_off = 0);
     let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     let root_ptr = Ptr.encode ~node_off:0 root_ptr in
     let freq_off = alloc b (Freq.size freq) in
+    let name_off = alloc b (String.length name + 1) in
+    w_int32 b dheader_off O.dict_header_t_name_off (Int32.of_int name_off);
+    w_int32 b dheader_off O.dict_header_t_root_ptr (Int32.of_int root_ptr);
+    w_int32 b dheader_off O.dict_header_t_freq_off (Int32.of_int freq_off);
+    w_str b freq_off 0 (freq :> string);
+    w_str b name_off 0 name;
+    w_uint8 b name_off (String.length name) 0
+
+  let write_trees b trees =
+    let dict_count = List.length trees in
+    let header_off = alloc b (S.header_t + (S.dict_header_t * dict_count)) in
+    assert (header_off = 0);
+    let dict_header i = header_off + S.header_t + (S.dict_header_t * i) in
+    List.iteri (fun i tree -> write_tree b (dict_header i) tree) trees;
     w_str b header_off O.header_t_magic C.c_HEADER_MAGIC;
     w_uint8 b header_off O.header_t_version C.c_FORMAT_VERSION;
-    w_int32 b header_off O.header_t_root_ptr (Int32.of_int root_ptr);
-    w_int32 b header_off O.header_t_freq_off (Int32.of_int freq_off);
-    w_str b freq_off 0 (freq :> string)
+    w_uint8 b header_off O.header_t_dict_count dict_count
 end
 
-let to_buf tree =
+let to_buf trees =
   let b = Buf.create 1_000_000 in
-  Writer.write_tree b tree;
+  Writer.write_trees b trees;
   b
 
-let to_string tree = Buf.to_string (to_buf tree)
-let output tree out_chan = Buf.output out_chan (to_buf tree)
+let to_string trees = Buf.to_string (to_buf trees)
+let output trees out_chan = Buf.output out_chan (to_buf trees)
 
 let hist (type a) to_s key ppf lst =
   let module M = Map.Make (struct
@@ -331,7 +343,7 @@ let hist (type a) to_s key ppf lst =
 let hist_int key ppf lst = hist string_of_int key ppf lst
 let hist_str key ppf lst = hist Fun.id key ppf lst
 
-let stats ppf ((tree, _root_id), freq) =
+let stats ppf { name = _; dfa = tree, _root_id; freq } =
   let open Optimized in
   let str_of_node_kind = function
     | Prefix _ -> "Prefix"
@@ -394,7 +406,8 @@ and pp_tr freq nodes index ppf tr =
   Format.fprintf ppf "freq=%d@ " (Freq.get freq index);
   pp freq nodes index ppf tr.next
 
-let pp ppf ((nodes, root_id), freq) = pp freq nodes 0 ppf root_id
+let pp ppf { name = _; dfa = nodes, root_id; freq } =
+  pp freq nodes 0 ppf root_id
 
 module Complete_tree = Complete_tree
 module K_medians = K_medians

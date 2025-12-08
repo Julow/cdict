@@ -1,16 +1,6 @@
 [@@@warning "-52"] (* Warning on string patterns matching [Failure] argument. *)
 
 let fail fmt = Format.kasprintf failwith fmt
-
-let create words =
-  let words = List.mapi (fun i w -> (w, i)) words in
-  let w = Cdict_builder.of_list ~freq:Fun.id words in
-  let data = Cdict_builder.to_string w in
-  (* Cdict_builder.stats Format.err_formatter w; *)
-  (* Hxd_string.pp Hxd.default Format.err_formatter data; *)
-  (* Format.pp_print_flush Format.err_formatter (); *)
-  Cdict.of_string data
-
 let fpf = Format.fprintf
 
 let expect ?(msg = "") pp_a got expected =
@@ -19,6 +9,18 @@ let expect ?(msg = "") pp_a got expected =
       "%sExpected: {@\n@[<v>%a@]@\n} but got: {@\n@[<v>%a@]@\n}@\n%!" msg pp_a
       expected pp_a got;
     failwith "Test failure")
+
+let create words =
+  let words = List.mapi (fun i w -> (w, i)) words in
+  let w = Cdict_builder.of_list ~name:"main" ~freq:Fun.id words in
+  let data = Cdict_builder.to_string [ w ] in
+  (* Cdict_builder.stats Format.err_formatter w; *)
+  (* Hxd_string.pp Hxd.default Format.err_formatter data; *)
+  (* Format.pp_print_flush Format.err_formatter (); *)
+  let cdict_header = Cdict.of_string data in
+  expect Format.pp_print_int (Array.length cdict_header) 1;
+  expect Format.pp_print_string (fst cdict_header.(0)) "main";
+  snd cdict_header.(0)
 
 let pp_leaf_opt ppf = function
   | Some leaf -> fpf ppf "%d" leaf

@@ -6,7 +6,9 @@
 #include <libcdict.h>
 #include <string.h>
 
-#define CDICT_VAL(v) ((cdict_t*)Data_custom_val(v))
+/** Get a [cdict_t const*] from a type [t].
+    {[ type t = nativeint * header ]} */
+#define CDICT_VAL(v) ((cdict_t const*)Nativeint_val(Field(v, 0)))
 
 static struct custom_operations const cdict_t_ops = {
   "Cdict.t",
@@ -42,17 +44,27 @@ static void result_of_value(value v, cdict_result_t *dst)
 value cdict_of_string_ocaml(value str)
 {
   CAMLparam1(str);
-  CAMLlocal1(dict);
-  // We must copy the string to ensure that it doesn't move during GC.
-  // The string is copied into the same custom block, after the cdict_t struct.
-  int s_len = caml_string_length(str);
-  dict = caml_alloc_custom_mem(&cdict_t_ops, sizeof(cdict_t) + s_len, 0);
-  void *data = ((void*)Data_custom_val(dict)) + sizeof(cdict_t);
-  memcpy(data, String_val(str), s_len);
-  cdict_cnstr_result_t r = cdict_of_string(data, s_len, CDICT_VAL(dict));
+  CAMLlocal4(dicts, elt, vheader, dict);
+  cdict_header_t const *header;
+  cdict_cnstr_result_t r =
+    cdict_of_string(String_val(str), caml_string_length(str), &header);
   if (r != CDICT_OK)
     caml_failwith(cdict_cnstr_result_to_string(r));
-  CAMLreturn(dict);
+  int n_dicts = header->n_dicts;
+  dicts = caml_alloc_tuple(n_dicts);
+  vheader = caml_alloc_custom_mem(&cdict_t_ops, sizeof(cdict_header_t*),
+        header->total_size);
+  for (int i = 0; i < n_dicts; i++)
+  {
+    dict = caml_alloc_tuple(2);
+    Store_field(dict, 0, caml_copy_nativeint((intnat)&header->dicts[i]));
+    Store_field(dict, 1, vheader);
+    elt = caml_alloc_tuple(2);
+    Store_field(elt, 0, caml_copy_string(header->dicts[i].name));
+    Store_field(elt, 1, dict);
+    Store_field(dicts, i, elt);
+  }
+  CAMLreturn(dicts);
 }
 
 value cdict_format_version_ocaml(value _unit)
