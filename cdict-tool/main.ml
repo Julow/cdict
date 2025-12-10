@@ -1,15 +1,25 @@
+open Astring
 open Cmdliner
+
+let arg_input_dictionaries =
+  let t =
+    let parser s =
+      match String.cut ~sep:":" s with
+      | Some (name, path) ->
+          Arg.Conv.parser Arg.file path |> Result.map (fun path -> (name, path))
+      | None -> Error "Missing dictionary name, use NAME:PATH."
+    and pp fmt (name, path) = Format.fprintf fmt "%s:%s" name path in
+    Arg.Conv.make ~docv:"NAME:PATH" ~parser ~pp ()
+  in
+  let doc = "Input files." in
+  Arg.(non_empty & pos_all t [] & info ~doc [])
 
 let cmd_build =
   let arg_output =
     let doc = "Output file." in
     Arg.(required & opt (some string) None & info ~doc [ "o" ])
   in
-  let arg_inputs =
-    let doc = "Input files." in
-    Arg.(value & pos_all file [] & info ~doc [])
-  in
-  let term = Term.(const Build.main $ arg_output $ arg_inputs) in
+  let term = Term.(const Build.main $ arg_output $ arg_input_dictionaries) in
   let doc =
     "Compile dictionaries for libcdict from text files. Supported formats are:\n\n\
     \  - AOSP word lists, if the file extension is .combined.\n\
@@ -29,6 +39,10 @@ let cmd_query =
     let doc = "Read the words to query from a file." in
     Arg.(value & opt (some file) None & info ~doc [ "from-file" ])
   in
+  let opt_dict_name =
+    let doc = "Name of the dictionary to use." in
+    Arg.(value & opt string "main" & info ~doc [ "d" ])
+  in
   let arg_dict =
     let doc = "Dictionary to query." in
     Arg.(required & pos 0 (some file) None & info ~doc ~docv:"DICT" [])
@@ -38,7 +52,9 @@ let cmd_query =
     Arg.(value & pos_right 0 string [] & info ~doc ~docv:"WORDS" [])
   in
   let term =
-    Term.(const Query.main $ opt_quiet $ opt_from_file $ arg_dict $ arg_queries)
+    Term.(
+      const Query.main $ opt_quiet $ opt_from_file $ opt_dict_name $ arg_dict
+      $ arg_queries)
   in
   let doc =
     "Query the specified words in the given dictionary. Exits with status \
@@ -47,11 +63,7 @@ let cmd_query =
   Cmd.(v (info "query" ~doc)) term
 
 let cmd_stats =
-  let arg_inputs =
-    let doc = "The same files that the 'build' command accepts." in
-    Arg.(value & pos_all file [] & info ~doc [])
-  in
-  let term = Term.(const Stats.main $ arg_inputs) in
+  let term = Term.(const Stats.main $ arg_input_dictionaries) in
   let doc = "Build a dictionary and print stats about its structure." in
   Cmd.(v (info "stats" ~doc)) term
 

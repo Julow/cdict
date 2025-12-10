@@ -19,16 +19,22 @@ let parse_file fname =
   | ".combined" -> parse_aosp_combined ~fname
   | _ -> parse_newline_separated ~fname
 
-let parse_files_into_cdict_builder inputs =
-  let words = List.concat_map parse_file inputs in
-  Printf.printf "Generating a %d words dictionary.\n%!" (List.length words);
-  Cdict_builder.of_list ~name:"main" ~freq:(fun f -> f) words
+let parse_files_into_cdict_builders inputs =
+  if not (List.exists (fun (n, _) -> n = "main") inputs) then
+    Format.eprintf "Warning: No dictionary named \"main\" specified@\n";
+  List.map
+    (fun (name, path) ->
+      let words = parse_file path in
+      Printf.printf "Built dictionary %S (%d words)\n%!" name
+        (List.length words);
+      Cdict_builder.of_list ~name ~freq:(fun f -> f) words)
+    inputs
 
 let main output inputs =
   try
-    let d = parse_files_into_cdict_builder inputs in
+    let ds = parse_files_into_cdict_builders inputs in
     Out_channel.with_open_bin output (fun out_chan ->
-        Cdict_builder.output [ d ] out_chan);
+        Cdict_builder.output ds out_chan);
     Printf.printf "Done.\n%!"
   with Failure msg ->
     Printf.eprintf "Error: %s\n%!" msg;

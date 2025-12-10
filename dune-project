@@ -16,7 +16,7 @@
 (package
  (name cdict-tool)
  (synopsis "Compiles dictionaries for the cdict library.")
- (depends cmdliner menhir cdict))
+ (depends cmdliner menhir cdict astring))
 
 (package
  (name dfa)
@@ -29,4 +29,3 @@
  (synopsis "Internal package.")
  (allow_empty)
  (depends cdict))
-
