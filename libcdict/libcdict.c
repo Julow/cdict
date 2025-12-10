@@ -23,36 +23,31 @@ static inline int min(int a, int b) { return (a < b) ? a : b; }
     cdict_of_string
     ************************************************************************ */
 
-cdict_cnstr_result_t cdict_of_string(char const *src_data, int total_size,
-    cdict_header_t const **dst)
+cdict_cnstr_result_t cdict_of_string(char const *data, int size,
+    cdict_header_t *dst)
 {
-  header_t const *src_h = (void const*)src_data;
+  header_t const *src_h = (void const*)data;
   if (memcmp(src_h->magic, HEADER_MAGIC, sizeof(src_h->magic)) != 0)
     return CDICT_NOT_A_DICTIONARY;
   if (src_h->version != FORMAT_VERSION)
     return CDICT_UNSUPPORTED_FORMAT;
-  int n_dicts = src_h->dict_count;
-  cdict_header_t *header = malloc(
-      sizeof(cdict_header_t) + sizeof(cdict_t) * n_dicts + total_size);
-  cdict_t *dicts = ((void*)header) + sizeof(cdict_header_t);
-  void *data = ((void*)dicts) + sizeof(cdict_t) * n_dicts;
-  for (int i = 0; i < n_dicts; i++)
-  {
-    dict_header_t const *dh = &src_h->dicts[i];
-    dicts[i] = (cdict_t){
-      .name = data + decode_int32(dh->name_off),
-      .root_node = data + decode_int32(dh->root_ptr),
-      .freq = data + decode_int32(dh->freq_off)
-    };
-  }
-  memcpy(data, src_data, total_size);
-  *header = (cdict_header_t){
-    .dicts = dicts,
-    .n_dicts = n_dicts,
-    .total_size = total_size
+  *dst = (cdict_header_t){
+    .data = data,
+    .n_dicts = src_h->dict_count,
+    .total_size = size
   };
-  *dst = header;
   return CDICT_OK;
+}
+
+void cdict_get_dict(cdict_header_t const *header, int i, cdict_t *dst)
+{
+  void const *data = header->data;
+  dict_header_t const *dh = &((header_t const*)data)->dicts[i];
+  *dst = (cdict_t){
+    .name = data + decode_int32(dh->name_off),
+    .root_node = data + decode_int32(dh->root_ptr),
+    .freq = data + decode_int32(dh->freq_off)
+  };
 }
 
 char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r)

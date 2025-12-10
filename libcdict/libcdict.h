@@ -16,13 +16,10 @@ typedef struct
   uint8_t const *freq;
 } cdict_t;
 
-/** Dictionary files can contain several dictionaries. */
 typedef struct
 {
-  cdict_t const *dicts;
-  /** The dictionary file can contain several dictionaries. The main dictionary
-      is called "main". */
-  int n_dicts; /** Length of the [names] and [dicts] array. */
+  char const *data;
+  int n_dicts; /** Number of dictionaries in the file. */
   int total_size; /** Total size in bytes. */
 } cdict_header_t;
 
@@ -34,12 +31,17 @@ typedef enum
   // Dictionary was created for an incompatible version of the library
 } cdict_cnstr_result_t;
 
-/** Create a in-memory dictionary from a string of a given size. The string is
-    copied. Allocate a single slot in memory and write a pointer to it into
-    [dst]. Free using [free]. Returns [CDICT_OK] on success or an error code if
-    the dictionary seems corrupted. */
+/** Create an in-memory dictionary from a string of a given size. The string is
+    not copied and must remain valid until the dictionary is no longer used. No
+    memory allocation is done by this function or any other function in the
+    library. Returns [CDICT_OK] on success or an error code if the dictionary
+    seems corrupted. */
 cdict_cnstr_result_t cdict_of_string(char const *data, int size,
-    cdict_header_t const **dst);
+    cdict_header_t *dst);
+
+/** Obtain the dictionaries at index [i] in the dictionary file and write it to
+    [dst]. [i] is in the range [0,header->n_dicts). */
+void cdict_get_dict(cdict_header_t const *header, int i, cdict_t *dst);
 
 /** Text description of an error for use in exceptions and logs. */
 char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r);
