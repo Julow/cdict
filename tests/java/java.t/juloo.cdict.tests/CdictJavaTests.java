@@ -9,7 +9,11 @@ public class CdictJavaTests
   static Cdict open_dict(String fname) throws Exception
   {
     byte[] data = Files.readAllBytes(FileSystems.getDefault().getPath(fname));
-    return Cdict.of_bytes(data);
+    Cdict[] dicts = Cdict.of_bytes(data);
+    for (Cdict d : dicts)
+      if (d.name.equals("main"))
+        return d;
+    throw new Exception("No dictionary named 'main'.");
   }
 
   static void query_distance(Cdict dict, int dist, String word)

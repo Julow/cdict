@@ -5,9 +5,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "juloo_cdict_Cdict.h"
+#include "juloo_cdict.h"
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+
+/** Structure pointed to by the [header_ptr] field in [Cdict.Header]. */
+typedef struct
+{
+  cdict_header_t header;
+  cdict_t const *dicts;
+  char const data[];
+} header_value;
 
 // JNI IDs for the Result class.
 static struct
@@ -74,19 +82,43 @@ JNIEXPORT jlong JNICALL Java_juloo_cdict_Cdict_of_1bytes_1native
 {
   int const len = (*env)->GetArrayLength(env, data);
   // Allocate and copy the dictionary data on the C heap.
-  void *dict = malloc(sizeof(cdict_t) + len);
-  void *dict_data = dict + sizeof(cdict_t);
+  header_value *hv = malloc(sizeof(header_value) + len);
+  void *dict_data = ((void*)hv) + sizeof(header_value);
   (*env)->GetByteArrayRegion(env, data, 0, len, dict_data);
-  cdict_cnstr_result_t r = cdict_of_string(dict_data, len, (cdict_t*)dict);
+  cdict_cnstr_result_t r = cdict_of_string(dict_data, len, &hv->header);
   if (r != CDICT_OK)
   {
-    free(dict);
+    free(hv);
     (*env)->ThrowNew(env,
         (*env)->FindClass(env, "juloo/cdict/Cdict$ConstructionError"),
         cdict_cnstr_result_to_string(r));
     return 0;
   }
-  return (jlong)dict;
+  int n_dicts = hv->header.n_dicts;
+  cdict_t *dicts = malloc(sizeof(cdict_t) * n_dicts);
+  for (int i = 0; i < n_dicts; i++)
+    cdict_get_dict(&hv->header, i, &dicts[i]);
+  hv->dicts = dicts;
+  return (jlong)hv;
+}
+
+JNIEXPORT jobjectArray JNICALL Java_juloo_cdict_Cdict_00024Header_get_1dicts_1native
+  (JNIEnv *env, jobject this, jlong header_ptr)
+{
+  jclass cdict_cls = (*env)->FindClass(env, "juloo/cdict/Cdict");
+  jmethodID cdict_cnstr = (*env)->GetMethodID(env, cdict_cls, "<init>",
+      "(Ljava/lang/String;JLjuloo/cdict/Cdict$Header;)V");
+  header_value const *hv = (void*)header_ptr;
+  int n_dicts = hv->header.n_dicts;
+  jobjectArray jdicts = (*env)->NewObjectArray(env, n_dicts, cdict_cls, NULL);
+  for (int i = 0; i < n_dicts; i++)
+  {
+    jstring jname = (*env)->NewStringUTF(env, hv->dicts[i].name);
+    (*env)->SetObjectArrayElement(env, jdicts, i,
+        (*env)->NewObject(env, cdict_cls, cdict_cnstr, jname,
+          (jlong)&hv->dicts[i], this));
+  }
+  return jdicts;
 }
 
 JNIEXPORT jobject JNICALL Java_juloo_cdict_Cdict_find_1native

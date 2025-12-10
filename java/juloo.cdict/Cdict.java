@@ -18,15 +18,20 @@ public class Cdict
     { found = false; index = -1; prefix_ptr = 0; }
   }
 
-  /** Load a dictionary stored in a string. The data is copied and not modified.
-      Use [cdict-tool] to construct the dictionary. */
-  public static Cdict of_bytes(byte[] data) throws ConstructionError
-  { return new Cdict(of_bytes_native(data)); }
+  /** Dictionary name. */
+  public final String name;
+
+  /** Load a dictionary file stored in a string. The dictionaries contained in
+      the file are returned as an array. They can be distinguished using the
+      [name] field, the main dictionary is named "main". The data is copied and
+      not modified. Use [cdict-tool] to construct the dictionary. */
+  public static Cdict[] of_bytes(byte[] data) throws ConstructionError
+  { return new Header(of_bytes_native(data)).get_dicts(); }
 
   /** Check whether the given word is recognized by the dictionary. Never
       return null. */
   public Result find(String word)
-  { return find_native(ptr, word); }
+  { return find_native(_ptr, word); }
 
   /** Lookup the frequency of a word. The frequency ranges from 0 to 15
       included and is used to sort words returned by [suffixes] and [distance].
@@ -34,18 +39,18 @@ public class Cdict
       index, either found in [Result.index] or returned by [suffixes] and
       [distance]. */
   public int freq(int index)
-  { return freq_native(ptr, index); }
+  { return freq_native(_ptr, index); }
 
   /** Lookup the word at a given index. [index] is a word index, either found
       in [Result.index] or returned by [suffixes] and [distance]. */
   public String word(int index)
-  { return word_native(ptr, index); }
+  { return word_native(_ptr, index); }
 
   /** List words that starts with the query passed to [find]. This can be called
       even if [result.found] is false. The returned array cannot contain more than
       [count] elements but might be smaller. */
   public int[] suffixes(Result result, int count)
-  { return suffixes_native(ptr, result, count); }
+  { return suffixes_native(_ptr, result, count); }
 
   /** [distance dict word ~dist ~count] lists words that are a specified number
       of edits from the given word according to Levenshtein distance.
@@ -54,14 +59,14 @@ public class Cdict
       frequent words are returned. The returned array cannot contain more than
       [count] elements but might be smaller. */
   public int[] distance(String word, int distance, int count)
-  { return distance_native(ptr, word, distance, count); }
+  { return distance_native(_ptr, word, distance, count); }
 
   /** Version of the dictionary's format. Dictionaries built for a different
       version are not compatible. */
   public static native int format_version();
 
   /** Thrown during construction. */
-  public class ConstructionError extends Exception
+  public static class ConstructionError extends Exception
   {
     public ConstructionError(String msg) { super(msg); }
   }
@@ -69,17 +74,29 @@ public class Cdict
   /** Internals */
 
   // A pointer to C allocated memory.
-  private final long ptr;
+  private final long _ptr;
+  private final Header _header;
 
-  private Cdict(long p)
+  private Cdict(String n, long p, Header h)
   {
-    ptr = p;
+    name = n;
+    _ptr = p;
+    _header = h;
   }
 
   static
   {
     System.loadLibrary("cdict_java");
     init();
+  }
+
+  private static class Header
+  {
+    private final long _ptr;
+    private Header(long p) { _ptr = p; }
+
+    public Cdict[] get_dicts() { return get_dicts_native(_ptr); }
+    public native Cdict[] get_dicts_native(long header_ptr);
   }
 
   private static native void init();
