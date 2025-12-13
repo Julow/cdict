@@ -26,7 +26,7 @@
 
 type id
 
-type transition = {
+type 'a transition = {
   c : char;
   next : id;
   number : int;
@@ -35,29 +35,29 @@ type transition = {
           [number] fields of all the transitions that were traversed is the
           perfect hash of that word. A number uniquely assigned to each words,
           from 1 to the number of words present in the dictionary (incl). *)
-  final : bool;
+  final : 'a option;
 }
 
-type state = transition list
+type 'a state = 'a transition list
 (** Transitions sorted in lexicographic order. *)
 
-type t
+type 'a t
 
-val state : t -> id -> state
+val state : 'a t -> id -> 'a state
 (** Access a state. From its ID. IDs are found in a state [tr] field. *)
 
-val root_state : t -> state
+val root_state : 'a t -> 'a state
 (** Access the root state. *)
 
-val of_sorted_list : string list -> t
+val of_sorted_list : (string * 'a) list -> 'a t
 (** Construct a minimal DFA from a lexicographically sorted list. If the list is
     not sorted, the DFA will not be minimal. Duplicated words are removed. *)
 
-val of_sorted_iter : ((string -> unit) -> unit) -> t
+val of_sorted_iter : ((string * 'a -> unit) -> unit) -> 'a t
 (** Like [of_sorted_list] but takes a partially applied [iter] function instead
     of a list. *)
 
-val pp : Format.formatter -> t -> unit
+val pp : Format.formatter -> 'a t -> unit
 (** Pretty print the internal structure of the DFA. For debugging purposes. *)
 
 (** Allowed operations on values of type [id]. *)

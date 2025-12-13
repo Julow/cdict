@@ -49,9 +49,15 @@ int main()
   FIELD(branches_t, header);
   FIELD(branches_t, length);
   FIELD(branches_t, labels);
+
   FIELD(prefix_t, next_ptr);
   FIELD(prefix_t, header);
   FIELD(prefix_t, prefix);
+
+  FIELD(alias_t, header);
+  FIELD(alias_t, index);
+  FIELD(alias_t, next);
+
   FIELD(header_t, magic);
   FIELD(header_t, version);
   FIELD(header_t, root_ptr);
@@ -62,6 +68,7 @@ int main()
 
   SIZE(branches_t);
   SIZE(prefix_t);
+  SIZE(alias_t);
   SIZE(header_t);
 
   end();

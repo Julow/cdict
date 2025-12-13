@@ -23,7 +23,13 @@ module Optimized = struct
 
   module IdMap = Map.Make (Id)
 
-  type tr = { final : bool; next : Id.t }
+  type final = int option
+  (** [Some _] indicates a final transition and [None] a non-final transition.
+      The embedded integer represent alias nodes, [0] means that the word is
+      present in the dictionary and any other value indicates that the entry is
+      a alias to an other word at the given index. *)
+
+  type tr = { final : final; next : Id.t }
 
   type branches = {
     labels : string;  (** Labels encodes a binary tree. *)
@@ -56,8 +62,8 @@ module Optimized = struct
   let rec fold_prefix dfa prefix next final =
     (* The maximum prefix length is [C.c_MAX_PTR_NUMBER] because it is encoded
        in the number field. *)
-    if final || String.length prefix >= C.c_PREFIX_MAX_LENGTH then
-      (prefix, next, final)
+    if Option.is_some final || String.length prefix >= C.c_PREFIX_MAX_LENGTH
+    then (prefix, next, final)
     else
       match state dfa next with
       | [ { c; next; number = 0; final } ] ->
@@ -236,20 +242,34 @@ module Writer = struct
     | I24 | U24 -> C.c_FORMAT_24_BITS
 
   let rec write_node seen b nodes { Optimized.final; next } =
-    let offset =
-      match Seen.find_opt next !seen with
-      | Some node -> node
-      | None ->
-          let node =
-            match Optimized.find next nodes with
-            (* | exception Not_found -> . *)
-            | Optimized.Prefix (p, tr) -> write_prefix_node seen b nodes p tr
-            | Branches brs -> write_branches_node seen b nodes brs
-          in
-          seen := Seen.add next node !seen;
-          node
-    in
-    Ptr.v ~final offset
+    match final with
+    | Some 0 | None ->
+        let final = Option.is_some final in
+        let offset =
+          match Seen.find_opt next !seen with
+          | Some node -> node
+          | None ->
+              let node =
+                match Optimized.find next nodes with
+                (* | exception Not_found -> . *)
+                | Optimized.Prefix (p, tr) ->
+                    write_prefix_node seen b nodes p tr
+                | Branches brs -> write_branches_node seen b nodes brs
+              in
+              seen := Seen.add next node !seen;
+              node
+        in
+        Ptr.v ~final offset
+    | Some alias -> write_alias_node seen b nodes alias next
+
+  and write_alias_node seen b nodes alias next =
+    let off = alloc b S.alias_t in
+    let next_ptr = write_node seen b nodes next in
+    let next_ptr = Ptr.encode ~node_off:off next_ptr in
+    w_uint8 b off O.alias_t_header C.tag_ALIAS;
+    w_uint24 b off O.alias_t_index alias;
+    w_uint24 b off O.alias_t_next next_ptr;
+    off
 
   and write_prefix_node seen b nodes p next =
     let len = String.length p in

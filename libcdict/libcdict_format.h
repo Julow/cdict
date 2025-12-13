@@ -22,11 +22,12 @@ typedef enum
 {
   BRANCHES = 0b0,
   PREFIX = 0b1,
+  ALIAS = 0b10,
 } kind_t;
 
 /** The first byte of nodes contains the node's kind with this mask. */
-#define NODE_KIND_MASK 0b1u
-#define NODE_KIND_BIT_LENGTH 1
+#define NODE_KIND_MASK 0b11u
+#define NODE_KIND_BIT_LENGTH 2
 
 #define NODE_KIND(NODE) (((uint8_t const*)(NODE))[0] & NODE_KIND_MASK)
 
@@ -159,6 +160,19 @@ typedef struct
 
 /** Length of the [prefix] array. */
 #define PREFIX_LENGTH(P) ((P)->header >> PREFIX_LENGTH_OFFSET)
+
+/** ALIAS nodes (size = 4 bytes)
+
+A alias node represent final transitions that corresponds to an entry that
+is an alias for an other word in the dictionary.
+*/
+
+typedef struct
+{
+  uint8_t header; /** Node kind. */
+  uint8_t index[3]; /** 24-bits big-endian unsigned integer. */
+  uint8_t next[3]; /** 32-bits big-endian signed integer. */
+} alias_t;
 
 /** Prefix pointer
 
