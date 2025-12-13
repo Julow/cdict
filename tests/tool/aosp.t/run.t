@@ -1,6 +1,6 @@
-  $ cdict-tool build -o dict words.combined
+  $ cdict-tool build -o dict main:words.combined
   Parsing "words.combined"
-  Generating a 7984 words dictionary.
+  Built dictionary "main" (7984 words)
   Done.
 
   $ ls -sh dict
@@ -136,9 +136,9 @@ Prefix search:
 
 Stats:
 
-  $ cdict-tool stats words.combined
+  $ cdict-tool stats main:words.combined
   Parsing "words.combined"
-  Generating a 7984 words dictionary.
+  Built dictionary "main" (7984 words)
   Nodes: 4785
   Branch nodes: 2262
     With size:

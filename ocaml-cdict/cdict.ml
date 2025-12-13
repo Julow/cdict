@@ -12,10 +12,10 @@ type result = {
       (** Internal pointer used to list words starting with a prefix. *)
 }
 
-external of_string : string -> t = "cdict_of_string_ocaml"
-(** Load a dictionary stored in a string. Use the library [cdict.builder] to
-    construct this dictionary. Raises [Failure] if the dictionary seems
-    corrupted. *)
+external of_string : string -> (string * t) array = "cdict_of_string_ocaml"
+(** Load dictionaries stored in a string. The main dictionary is called
+    ["main"]. Use the library [cdict.builder] to construct the dictionaries.
+    Raises [Failure] if the dictionary seems corrupted. *)
 
 external find : t -> string -> result = "cdict_find_ocaml"
 (** Lookup a word in the dictionary. *)

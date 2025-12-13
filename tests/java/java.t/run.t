@@ -1,6 +1,6 @@
-  $ cdict-tool build -o dict ocaml_manual.txt
+  $ cdict-tool build -o dict main:ocaml_manual.txt
   Parsing "ocaml_manual.txt"
-  Generating a 7984 words dictionary.
+  Built dictionary "main" (7984 words)
   Done.
 
   $ java -cp cdict_java.jar -Djava.library.path=$PWD juloo.cdict.tests/CdictJavaTests.java -- dict types

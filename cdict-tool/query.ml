@@ -1,6 +1,8 @@
-let open_dict fname =
+let open_dict dict_name fname =
   let data = In_channel.(with_open_bin fname input_all) in
-  Cdict.of_string data
+  match Array.find_opt (fun (n, _) -> n = dict_name) (Cdict.of_string data) with
+  | Some (_, d) -> d
+  | None -> assert false
 
 let queries_from_file = function
   | Some fname -> In_channel.(with_open_text fname input_lines)
@@ -31,7 +33,7 @@ let query ~quiet dict q =
     query_distance dict ~dist:2 q);
   if r.found then 0 else 1
 
-let main quiet from_file dict_fname queries =
-  let dict = open_dict dict_fname in
+let main quiet from_file dict_name dict_fname queries =
+  let dict = open_dict dict_name dict_fname in
   let queries = queries @ queries_from_file from_file in
   exit (List.fold_left (fun n q -> query ~quiet dict q + n) 0 queries)

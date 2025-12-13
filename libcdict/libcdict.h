@@ -11,13 +11,18 @@
 
 typedef struct
 {
-  void const *data;
-  size_t size;
-  int32_t root_ptr;
+  char const *name;
+  void const *root_node;
   uint8_t const *freq;
 } cdict_t;
 
-/** Returned by [cdict_of_string]. */
+typedef struct
+{
+  char const *data;
+  int n_dicts; /** Number of dictionaries in the file. */
+  int total_size; /** Total size in bytes. */
+} cdict_header_t;
+
 typedef enum
 {
   CDICT_OK, // The dictionary was succesfully loaded
@@ -26,11 +31,17 @@ typedef enum
   // Dictionary was created for an incompatible version of the library
 } cdict_cnstr_result_t;
 
-/** Create a in-memory dictionary from a string of a given size. The string is
-    not copied and must remain valid until the dictionary stops being used.
-    Write into [dst]. Returns [CDICT_OK] on success or an error code if the
-    dictionary seems corrupted. */
-cdict_cnstr_result_t cdict_of_string(char const *data, int size, cdict_t *dst);
+/** Create an in-memory dictionary from a string of a given size. The string is
+    not copied and must remain valid until the dictionary is no longer used. No
+    memory allocation is done by this function or any other function in the
+    library. Returns [CDICT_OK] on success or an error code if the dictionary
+    seems corrupted. */
+cdict_cnstr_result_t cdict_of_string(char const *data, int size,
+    cdict_header_t *dst);
+
+/** Obtain the dictionaries at index [i] in the dictionary file and write it to
+    [dst]. [i] is in the range [0,header->n_dicts). */
+void cdict_get_dict(cdict_header_t const *header, int i, cdict_t *dst);
 
 /** Text description of an error for use in exceptions and logs. */
 char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r);

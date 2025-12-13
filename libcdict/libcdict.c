@@ -23,22 +23,31 @@ static inline int min(int a, int b) { return (a < b) ? a : b; }
     cdict_of_string
     ************************************************************************ */
 
-cdict_cnstr_result_t cdict_of_string(char const *data, int size, cdict_t *dst)
+cdict_cnstr_result_t cdict_of_string(char const *data, int size,
+    cdict_header_t *dst)
 {
-  header_t const *h = (void const*)data;
-  if (memcmp(h->magic, HEADER_MAGIC, sizeof(h->magic)) != 0)
+  header_t const *src_h = (void const*)data;
+  if (memcmp(src_h->magic, HEADER_MAGIC, sizeof(src_h->magic)) != 0)
     return CDICT_NOT_A_DICTIONARY;
-  if (h->version != FORMAT_VERSION)
+  if (src_h->version != FORMAT_VERSION)
     return CDICT_UNSUPPORTED_FORMAT;
-  int root_ptr = decode_int32(h->root_ptr);
-  int freq_off = decode_int32(h->freq_off);
-  *dst = (cdict_t){
+  *dst = (cdict_header_t){
     .data = data,
-    .size = size,
-    .root_ptr = root_ptr,
-    .freq = (uint8_t const*)(data + freq_off)
+    .n_dicts = src_h->dict_count,
+    .total_size = size
   };
   return CDICT_OK;
+}
+
+void cdict_get_dict(cdict_header_t const *header, int i, cdict_t *dst)
+{
+  void const *data = header->data;
+  dict_header_t const *dh = &((header_t const*)data)->dicts[i];
+  *dst = (cdict_t){
+    .name = data + decode_int32(dh->name_off),
+    .root_node = data + decode_int32(dh->root_ptr),
+    .freq = data + decode_int32(dh->freq_off)
+  };
 }
 
 char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r)
@@ -133,7 +142,7 @@ void cdict_find(cdict_t const *dict, char const *word, int word_size,
     cdict_result_t *result)
 {
   *result = RESULT_T_INIT;
-  cdict_find_node(dict->data, dict->root_ptr, word, word + word_size, 0,
+  cdict_find_node(dict->root_node, 0, word, word + word_size, 0,
       result);
 }
 
@@ -216,7 +225,7 @@ static int cdict_word_node(void const *parent_node, int ptr, int index,
 
 int cdict_word(cdict_t const *dict, int index, char *dst, int max_length)
 {
-  return cdict_word_node(dict->data, dict->root_ptr, index, dst, 0, max_length);
+  return cdict_word_node(dict->root_node, 0, index, dst, 0, max_length);
 }
 
 /** ************************************************************************
@@ -480,6 +489,6 @@ int cdict_distance(cdict_t const *dict, char const *word, int wlen, int dist,
   word_freq_t words[count];
   priority_t queue;
   priority_init(&queue, words, count);
-  distance(dict, dict->data, dict->root_ptr, word, word + wlen, 0, dist, &queue);
+  distance(dict, dict->root_node, 0, word, word + wlen, 0, dist, &queue);
   return priority_to_sorted_array(&queue, dst, count);
 }

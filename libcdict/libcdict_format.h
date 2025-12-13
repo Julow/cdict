@@ -178,14 +178,23 @@ Located at the beginning of the dictionary.
 
 typedef struct
 {
-  uint8_t magic[3]; /** Magic number. */
-  uint8_t version;
-  /** Format version. Supported version is [FORMAT_VERSION]. */
+  uint8_t name_off[4];
+  /** 32-bits big-endian signed integer. Absolute offset to the NUL-terminated
+      name of the dictionary. */
   uint8_t root_ptr[4];
   /** 32-bits big-endian signed integer. Pointer to the root node. */
   uint8_t freq_off[4];
-  /** 32-bits big-endian signed integer. Offset to the 4-bits integer array
-      storing the frequency of each words. */
+  /** 32-bits big-endian signed integer. Absolute offset to the 4-bits integer
+   * array storing the frequency of each words. */
+} dict_header_t;
+
+typedef struct
+{
+  uint8_t magic[3]; /** Magic number. */
+  uint8_t version;
+  /** Format version. Supported version is [FORMAT_VERSION]. */
+  uint8_t dict_count; /** Number of dicts in [dicts]. */
+  dict_header_t dicts[]; /** Dictionaries. */
 } header_t;
 
 #define HEADER_MAGIC "Dic"
