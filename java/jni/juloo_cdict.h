@@ -33,6 +33,14 @@ JNIEXPORT jlong JNICALL Java_juloo_cdict_Cdict_of_1bytes_1native
 
 /*
  * Class:     juloo_cdict_Cdict
+ * Method:    finalize_header
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_juloo_cdict_Cdict_finalize_1header
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     juloo_cdict_Cdict
  * Method:    find_native
  * Signature: (JLjava/lang/String;)Ljuloo/cdict/Cdict/Result;
  */

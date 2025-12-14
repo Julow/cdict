@@ -121,6 +121,12 @@ JNIEXPORT jobjectArray JNICALL Java_juloo_cdict_Cdict_00024Header_get_1dicts_1na
   return jdicts;
 }
 
+JNIEXPORT void JNICALL Java_juloo_cdict_Cdict_finalize_1header
+  (JNIEnv *env, jclass _cls, jlong header_ptr)
+{
+  free((void*)header_ptr);
+}
+
 JNIEXPORT jobject JNICALL Java_juloo_cdict_Cdict_find_1native
   (JNIEnv *env, jclass _cls, jlong dictl, jstring jword)
 {

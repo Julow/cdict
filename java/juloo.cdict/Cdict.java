@@ -97,10 +97,13 @@ public class Cdict
 
     public Cdict[] get_dicts() { return get_dicts_native(_ptr); }
     public native Cdict[] get_dicts_native(long header_ptr);
+    @Override
+    protected void finalize() throws Throwable { finalize_header(_ptr); }
   }
 
   private static native void init();
   private static native long of_bytes_native(byte[] data);
+  private static native void finalize_header(long header);
   private static native Result find_native(long dict, String word);
   private static native int freq_native(long dict, int index);
   private static native String word_native(long dict, int index);
