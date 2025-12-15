@@ -176,17 +176,37 @@ It is exposed in 'cdict_result_t' but not used outside of the library.
 Located at the beginning of the dictionary.
 */
 
+/** 32-bits big-endian signed integer. */
+typedef uint8_t int32be[4];
+
 typedef struct
 {
-  uint8_t name_off[4];
-  /** 32-bits big-endian signed integer. Absolute offset to the NUL-terminated
-      name of the dictionary. */
-  uint8_t root_ptr[4];
-  /** 32-bits big-endian signed integer. Pointer to the root node. */
-  uint8_t freq_off[4];
-  /** 32-bits big-endian signed integer. Absolute offset to the 4-bits integer
-   * array storing the frequency of each words. */
+  int32be name_off;
+  /** Absolute offset to the NUL-terminated name of the dictionary. */
+  int32be root_ptr;
+  /** Pointer to the root node. */
+  int32be freq_off;
+  /** Absolute offset to the 4-bits integer array storing the frequency of each
+      words. */
+  uint8_t aliases_header;
+  /** Specifies the format of [aliases_keys] and [aliases_values]. */
+  uint8_t aliases_length;
+  /** Number of aliases. */
+  int32be aliases_keys;
+  /** Absolute offset to a complete binary tree encoded as an array. It stores
+      the indexes of words that are aliases to other words. The array format is
+      specified by [aliases_header].  */
+  int32be aliases_values;
+  /** Absolute offset to an array whose format is specified by
+      [aliases_header]. Stores indexes to words pointed by aliases in
+      [aliases_keys]. */
 } dict_header_t;
+
+/** Offset in [aliases_header] to [aliases_keys]'s format (format_t). */
+#define ALIASES_KEYS_FORMAT_OFFSET 0
+/** Offset in [aliases_header] to [aliases_values]'s format (format_t). */
+#define ALIASES_VALUES_FORMAT_OFFSET \
+  (ALIASES_KEYS_FORMAT_OFFSET + FORMAT_T_BIT_LENGTH)
 
 typedef struct
 {

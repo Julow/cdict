@@ -37,6 +37,8 @@ int main()
   VAL(c_, BRANCHES_BRANCHES_FORMAT_OFFSET);
   VAL(c_, BRANCHES_NUMBERS_FORMAT_OFFSET);
   VAL(c_, PREFIX_LENGTH_OFFSET);
+  VAL(c_, ALIASES_KEYS_FORMAT_OFFSET);
+  VAL(c_, ALIASES_VALUES_FORMAT_OFFSET);
   VAL_STR(c_, HEADER_MAGIC);
   VAL(mask_, PTR_OFFSET_MASK);
   VAL(flag_, PTR_FLAG_FINAL);
@@ -59,6 +61,10 @@ int main()
   FIELD(dict_header_t, name_off);
   FIELD(dict_header_t, root_ptr);
   FIELD(dict_header_t, freq_off);
+  FIELD(dict_header_t, aliases_header);
+  FIELD(dict_header_t, aliases_length);
+  FIELD(dict_header_t, aliases_keys);
+  FIELD(dict_header_t, aliases_values);
 
   end();
   module("S");

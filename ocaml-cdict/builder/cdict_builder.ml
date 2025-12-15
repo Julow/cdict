@@ -150,9 +150,58 @@ end = struct
   let to_int_list t = List.init (size t * 2) (get t)
 end
 
-type 'a t = { name : string; dfa : Optimized.t; freq : Freq.t }
+module Aliases = struct
+  (** An associative table from word indexes to word indexes implemented as a
+      complete binary tree encoded as arrays. *)
 
-let of_list ~name ~freq words =
+  type t = {
+    keys : Sized_int_array.t;
+    values : Sized_int_array.t;
+    length : int;
+  }
+
+  (** Search for the entry in the array where [cmp] returns [0]. [cmp x] must
+      return an integer smaller than [0] when the searched entry is smaller than
+      [x] and an integer bigger than [0] when it is bigger than [x]. *)
+  let bsearch ar cmp =
+    let rec loop ar cmp lo hi =
+      if lo >= hi then None
+      else
+        let mid = (lo + hi) / 2 in
+        let d = cmp ar.(mid) in
+        if d = 0 then Some mid
+        else if d < 0 then loop ar cmp lo mid
+        else loop ar cmp (mid + 1) hi
+    in
+    loop ar cmp 0 (Array.length ar)
+
+  let empty () =
+    let ar = Sized_int_array.mk U8 [||] in
+    { keys = ar; values = ar; length = 0 }
+
+  let of_sorted_list ~alias words =
+    let length = Array.length words in
+    let ar = Dynarray.create () in
+    let search w = bsearch words (fun (w', _) -> String.compare w w') in
+    for i = 0 to length - 1 do
+      let _, data = words.(i) in
+      match Option.bind (alias data) search with
+      | Some i2 -> Dynarray.add_last ar (i, i2)
+      | None -> ()
+    done;
+    let ar = Dynarray.to_array ar |> Complete_tree.of_sorted_array in
+    let mk_sized f = Sized_int_array.mk_detect ~signed:false (Array.map f ar) in
+    { keys = mk_sized fst; values = mk_sized snd; length }
+end
+
+type 'a t = {
+  name : string;
+  dfa : Optimized.t;
+  freq : Freq.t;
+  aliases : Aliases.t;
+}
+
+let of_list ~name ~freq ?alias words =
   let words = Array.of_list words in
   Array.sort (fun (a, _) (b, _) -> String.compare a b) words;
   let dfa =
@@ -160,7 +209,12 @@ let of_list ~name ~freq words =
     |> Optimized.of_dfa
   in
   let freq = Freq.of_int_array (Array.map (fun (_, data) -> freq data) words) in
-  { name; dfa; freq }
+  let aliases =
+    match alias with
+    | Some alias -> Aliases.of_sorted_list ~alias words
+    | None -> Aliases.empty ()
+  in
+  { name; dfa; freq; aliases }
 
 module Buf = struct
   type t = { mutable b : bytes; mutable end_ : int }
@@ -274,14 +328,16 @@ module Writer = struct
     let length = String.length labels in
     let branches_start_off = S.branches_t + length in
     let numbers_start_off =
-      branches_start_off + Sized_int_array.size branches
+      branches_start_off + Sized_int_array.size_bytes branches
     in
     let header =
       (format_t_of_array branches lsl C.c_BRANCHES_BRANCHES_FORMAT_OFFSET)
       lor (format_t_of_array numbers lsl C.c_BRANCHES_NUMBERS_FORMAT_OFFSET)
       lor C.tag_BRANCHES
     in
-    let off' = alloc b (numbers_start_off + Sized_int_array.size numbers) in
+    let off' =
+      alloc b (numbers_start_off + Sized_int_array.size_bytes numbers)
+    in
     assert (off = off');
     w_uint8 b off O.branches_t_header header;
     w_uint8 b off O.branches_t_length length;
@@ -290,14 +346,28 @@ module Writer = struct
     w_bytes b off numbers_start_off (snd numbers);
     off
 
+  let write_aliases b dheader_off { Aliases.keys; values; length } =
+    let keys_off = alloc b (Sized_int_array.size_bytes keys) in
+    let values_off = alloc b (Sized_int_array.size_bytes values) in
+    let header =
+      (format_t_of_array keys lsl C.c_ALIASES_KEYS_FORMAT_OFFSET)
+      lor (format_t_of_array values lsl C.c_ALIASES_VALUES_FORMAT_OFFSET)
+    in
+    w_uint8 b dheader_off O.dict_header_t_aliases_header header;
+    w_uint8 b dheader_off O.dict_header_t_aliases_length length;
+    w_int32 b dheader_off O.dict_header_t_aliases_keys (Int32.of_int keys_off);
+    w_int32 b dheader_off O.dict_header_t_aliases_values
+      (Int32.of_int values_off)
+
   (** Write [dict_header_t] fields to [dheader_off]. *)
-  let write_tree b dheader_off { name; dfa = nodes, root_id; freq } =
+  let write_tree b dheader_off { name; dfa = nodes, root_id; freq; aliases } =
     let seen = ref Seen.empty in
     let root_tr = { Optimized.final = false; next = root_id } in
     let root_ptr = write_node seen b nodes root_tr in
     let root_ptr = Ptr.encode ~node_off:0 root_ptr in
     let freq_off = alloc b (Freq.size freq) in
     let name_off = alloc b (String.length name + 1) in
+    write_aliases b dheader_off aliases;
     w_int32 b dheader_off O.dict_header_t_name_off (Int32.of_int name_off);
     w_int32 b dheader_off O.dict_header_t_root_ptr (Int32.of_int root_ptr);
     w_int32 b dheader_off O.dict_header_t_freq_off (Int32.of_int freq_off);
@@ -343,7 +413,7 @@ let hist (type a) to_s key ppf lst =
 let hist_int key ppf lst = hist string_of_int key ppf lst
 let hist_str key ppf lst = hist Fun.id key ppf lst
 
-let stats ppf { name = _; dfa = tree, _root_id; freq } =
+let stats ppf { name = _; dfa = tree, _root_id; freq; aliases } =
   let open Optimized in
   let str_of_node_kind = function
     | Prefix _ -> "Prefix"
@@ -385,6 +455,7 @@ let stats ppf { name = _; dfa = tree, _root_id; freq } =
   let freq = Freq.to_int_list freq in
   Format.fprintf ppf "@[<v 2>Freq: %d@ With value:@ %a@]@\n" (List.length freq)
     (hist_int Fun.id) freq;
+  Format.fprintf ppf "@[<v 2>Aliases: %d@]@\n" aliases.length;
   ()
 
 let rec pp freq nodes index ppf id =
@@ -406,7 +477,7 @@ and pp_tr freq nodes index ppf tr =
   Format.fprintf ppf "freq=%d@ " (Freq.get freq index);
   pp freq nodes index ppf tr.next
 
-let pp ppf { name = _; dfa = nodes, root_id; freq } =
+let pp ppf { name = _; dfa = nodes, root_id; freq; aliases = _ } =
   pp freq nodes 0 ppf root_id
 
 module Complete_tree = Complete_tree

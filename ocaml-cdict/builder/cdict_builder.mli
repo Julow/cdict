@@ -5,8 +5,19 @@ type 'a t
     metadata attached. This stores the entire dictionary in memory, in a
     space-inefficient way. *)
 
-val of_list : name:string -> freq:('a -> int) -> (string * 'a) list -> 'a t
-(** Construct a dictionary from a list. *)
+val of_list :
+  name:string ->
+  freq:('a -> int) ->
+  ?alias:('a -> string option) ->
+  (string * 'a) list ->
+  'a t
+(** Construct a dictionary from a list.
+
+    [alias w1] creates an entry in the alias dictionary if it returns [Some w2]
+    defining that [w1] is an alias of [w2]. The alias dictionary is an extra
+    dictionary, named [name ^ ".alias"], that specifies whether a word is an
+    alias to an other word. It is not created if [alias] returned [None] for
+    every words in the list (the default). *)
 
 val output : 'a t list -> Out_channel.t -> unit
 (** Write a dictionary file containing a list of dictionaries into the given
