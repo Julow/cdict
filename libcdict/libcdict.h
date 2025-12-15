@@ -14,6 +14,10 @@ typedef struct
   char const *name;
   void const *root_node;
   uint8_t const *freq;
+  uint8_t aliases_header;
+  int aliases_length;
+  uint8_t const *aliases_keys;
+  uint8_t const *aliases_values;
 } cdict_t;
 
 typedef struct
