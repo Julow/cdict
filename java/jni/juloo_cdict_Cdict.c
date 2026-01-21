@@ -57,6 +57,7 @@ static jarray jarray_of_int_array(JNIEnv *env, int const *src, int len)
 #define STACK_ALLOCATED_GETSTRINGUTF(VARNAME, JWORD) \
   int jword_len = (*env)->GetStringLength(env, JWORD); \
   char VARNAME[jword_len * 3 + 1]; \
+  memset(VARNAME, 0, sizeof(VARNAME)); \
   (*env)->GetStringUTFRegion(env, JWORD, 0, jword_len, VARNAME);
 
 /** Methods */
