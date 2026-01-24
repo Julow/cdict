@@ -13,7 +13,6 @@
 TODO: Some words are not found back due to some encoding issues.
 
   $ cdict-tool query -q dict --from-file ocaml_manual.txt
-  [3]
 
   $ cdict-tool query -d main dict foo
   found: "foo" freq=15 index=4223
