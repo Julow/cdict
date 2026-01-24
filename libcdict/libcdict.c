@@ -73,13 +73,13 @@ static void cdict_find_node(void const *parent_node, int ptr,
 static void cdict_find_branches(branches_t const *b,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
-  char c = *word;
+  uchar c = *word;
   int len = b->length;
   for (int i = 0; i < len;)
   {
     // [l] is NUL when stepping outside of the tree but [k] cannot be NUL so we
     // don't have to check for this case.
-    char l = b->labels[i];
+    uchar l = b->labels[i];
     if (c == l)
     {
       index += branch_number(b, i);
@@ -105,12 +105,13 @@ static void find_ends(void const *parent_node, int ptr, int index, bool found,
 static void cdict_find_prefix(prefix_t const *node,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
-  char const *prefix = node->prefix;
-  char const *prefix_end = prefix + PREFIX_LENGTH(node);
+  uchar const *prefix = node->prefix;
+  uchar const *prefix_end = prefix + PREFIX_LENGTH(node);
   int next_ptr = decode_int24(node->next_ptr);
   while (true)
   {
-    if (*(word++) != *(prefix++)) return; // Prefix doesn't match
+    uchar c = *word++;
+    if (c != *(prefix++)) return; // Prefix doesn't match
     if (prefix == prefix_end) // Prefix matches
       return cdict_find_node(node, next_ptr, word, end, index, result);
     if (word == end) // Query ends
@@ -195,7 +196,7 @@ static int cdict_word_prefix(prefix_t const *p, int index,
     char *dst, int dsti, int max_len)
 {
   int end = dsti + PREFIX_LENGTH(p);
-  char const *prefix = p->prefix;
+  uchar const *prefix = p->prefix;
   if (end > max_len)
     end = max_len;
   while (dsti < end)
@@ -382,7 +383,7 @@ static void distance_branches(cdict_t const *dict, branches_t const *b,
     char const *word, char const *end, int index, int dist, priority_t *q)
 {
   int len = b->length;
-  char c = *word;
+  uchar c = *word;
   for (int i = 0; i < len; i++)
   {
     int next_index = index + branch_number(b, i);
@@ -433,7 +434,8 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   int len = PREFIX_LENGTH(p);
   int word_len = ((intptr_t)end) - ((intptr_t)word);
   int common_len = min(word_len, len);
-  int pdist = levenshtein_distance(word, common_len, p->prefix, common_len);
+  int pdist =
+    levenshtein_distance(word, common_len, (char const*)p->prefix, common_len);
   int next_ptr = decode_int24(p->next_ptr);
   if (word_len < len)
   {

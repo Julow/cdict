@@ -18,6 +18,9 @@ All integers are in big-endian order.
 
 #include <stdint.h>
 
+/** Chars are unsigned in the data-structure. */
+typedef uint8_t uchar;
+
 typedef enum
 {
   BRANCHES = 0b0,
@@ -106,7 +109,7 @@ typedef struct
   uint8_t length;
   /** Length of the 'labels' and 'branches' arrays. Not the offset to the
       'branches' array. */
-  char labels[];
+  uchar labels[];
   // uint8_t branches[]; /** Use [branch(b, i)] to access. */
   // uint8_t numbers[]; /** Use [branch_number(b, i)] to access. */
 } branches_t;
@@ -151,7 +154,7 @@ typedef struct
 {
   uint8_t header; /** Length and node kind. */
   uint8_t next_ptr[3]; /** 24-bits big-endian signed integer. */
-  char prefix[];
+  uchar prefix[];
 } prefix_t;
 
 #define PREFIX_LENGTH_OFFSET NODE_KIND_BIT_LENGTH
