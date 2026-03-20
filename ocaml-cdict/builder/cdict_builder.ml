@@ -202,8 +202,8 @@ type 'a t = {
 }
 
 let of_list ~name ~freq ?alias words =
+  let words = List.sort_uniq (fun (a, _) (b, _) -> String.compare a b) words in
   let words = Array.of_list words in
-  Array.sort (fun (a, _) (b, _) -> String.compare a b) words;
   let dfa =
     Dfa.of_sorted_iter (fun f -> Array.iter (fun (w, _) -> f w) words)
     |> Optimized.of_dfa
