@@ -6,18 +6,18 @@
   4.0K dict
 
   $ cdict-tool query dict sourire heureux smiley joie haha 😀
-  found: "sourire" freq=0 index=5
+  found: "\240\159\152\128" freq=0 index=5
   close match: "sourire" distance=2 freq=5 index=4
   close match: "sourire" distance=2 freq=5 index=4
-  found: "heureux" freq=0 index=8
+  found: "\240\159\152\132" freq=0 index=8
   close match: "heureux" distance=2 freq=5 index=1
   close match: "heureux" distance=2 freq=5 index=1
-  found: "smiley" freq=0 index=7
+  found: "\240\159\152\131" freq=0 index=7
   close match: "smiley" distance=2 freq=5 index=3
   close match: "smiley" distance=2 freq=5 index=3
-  found: "joie" freq=0 index=8
+  found: "\240\159\152\132" freq=0 index=8
   close match: "joie" distance=2 freq=5 index=2
-  found: "haha" freq=0 index=9
+  found: "\240\159\152\134" freq=0 index=9
   close match: "haha" distance=2 freq=5 index=0
   close match: "haha" distance=2 freq=5 index=0
   found: "\240\159\152\128" freq=0 index=5

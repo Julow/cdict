@@ -19,8 +19,9 @@ let query ~quiet dict q =
   let r : Cdict.result = Cdict.find dict q in
   if not quiet then (
     if r.found then
+      let w = Cdict.word dict r.index in
       let freq = Cdict.freq dict r.index in
-      Printf.printf "found: %S freq=%d index=%d\n" q freq (r.index :> int)
+      Printf.printf "found: %S freq=%d index=%d\n" w freq (r.index :> int)
     else Printf.printf "not found: %S\n" q;
     let prefixes_idx = Cdict.suffixes dict r 5 in
     Array.iter
