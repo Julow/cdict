@@ -65,7 +65,7 @@ let assert_not_found d word =
   | Some leaf -> fail "Expected not found but got %d for word %S" leaf word
   | None -> ()
 
-let () = assert (Cdict.format_version () = 0)
+let () = assert (Cdict.format_version () = 1)
 
 (* Fruit test *)
 let () =

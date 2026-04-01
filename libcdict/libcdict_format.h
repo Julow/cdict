@@ -14,7 +14,7 @@ All integers are in big-endian order.
 */
 
 /** Incremented when the format changes. */
-#define FORMAT_VERSION 0
+#define FORMAT_VERSION 1
 
 #include <stdint.h>
 
