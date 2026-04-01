@@ -19,7 +19,34 @@ let cmd_build =
     let doc = "Output file." in
     Arg.(required & opt (some string) None & info ~doc [ "o" ])
   in
-  let term = Term.(const Build.main $ arg_output $ arg_input_dictionaries) in
+  let opt_substitutions =
+    let doc =
+      {|
+Path to a file describing substitutions in JSON format. An associative array
+with string values is expected.
+For every words in the input word lists, a word alias is created with all the
+substitutions described in this file applied. Alias words are not created if
+the result of the substitution is already present in the word list or was
+already created for an earlier word.
+
+For example, with the following substitutions:
+
+{ "D": "d", "a": "", "i": "", "o": "", "y": "", "n": "m", "t": "d" }
+
+The alias "dcdmr" is created for the word "Dictionary".
+This can be used to detect spelling mistake like missing diacritics, wrong case
+or to implement a very simple soundex-like system.
+|}
+    in
+    Arg.(
+      value
+      & opt (some file) None
+      & info ~doc ~docv:"SUBST.json" [ "s"; "subst-file" ])
+  in
+  let term =
+    Term.(
+      const Build.main $ opt_substitutions $ arg_output $ arg_input_dictionaries)
+  in
   let doc =
     "Compile dictionaries for libcdict from text files. Supported formats are:\n\n\
     \  - AOSP word lists, if the file extension is .combined.\n\
@@ -43,6 +70,13 @@ let cmd_query =
     let doc = "Name of the dictionary to use." in
     Arg.(value & opt string "main" & info ~doc [ "d" ])
   in
+  let opt_substitutions =
+    let doc =
+      "Path to the same file passed to the 'build' command with the same \
+       option."
+    in
+    Arg.(value & opt (some file) None & info ~doc [ "s"; "subst-file" ])
+  in
   let arg_dict =
     let doc = "Dictionary to query." in
     Arg.(required & pos 0 (some file) None & info ~doc ~docv:"DICT" [])
@@ -53,8 +87,8 @@ let cmd_query =
   in
   let term =
     Term.(
-      const Query.main $ opt_quiet $ opt_from_file $ opt_dict_name $ arg_dict
-      $ arg_queries)
+      const Query.main $ opt_quiet $ opt_from_file $ opt_dict_name
+      $ opt_substitutions $ arg_dict $ arg_queries)
   in
   let doc =
     "Query the specified words in the given dictionary. Exits with status \
