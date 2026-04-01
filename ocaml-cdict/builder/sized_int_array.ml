@@ -103,7 +103,15 @@ let set (format, b) i v =
   set b i v
 
 let format = fst
-let size (_, b) = Bytes.length b
+let size_bytes (_, b) = Bytes.length b
+
+let length (format, b) =
+  let l = Bytes.length b in
+  match format with
+  | I4 | U4 -> l lsl 1
+  | I8 | U8 -> l
+  | I16 | U16 -> l lsr 1
+  | I24 | U24 -> l / 3
 
 let format_to_string = function
   | I4 -> "I4"

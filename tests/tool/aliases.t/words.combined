@@ -1,0 +1,20 @@
+dictionary=Emojis:fr,description=Emojis pour mots Français,locale=fr,date=1689758553,version=50
+ word=sourire,f=14,not_a_word=true
+  shortcut=😀,f=14
+ word=sourire,f=14,not_a_word=true
+  shortcut=😄,f=14
+  shortcut=😀,f=14
+ word=heureux,f=14,not_a_word=true
+  shortcut=😄,f=14
+  shortcut=😆,f=14
+  shortcut=😃,f=14
+  shortcut=😀,f=14
+ word=smiley,f=14,not_a_word=true
+  shortcut=😃,f=14
+ word=joie,f=14,not_a_word=true
+  shortcut=😄,f=14
+  shortcut=😂,f=14
+  shortcut=😃,f=14
+ word=haha,f=14,not_a_word=true
+  shortcut=😆,f=14
+  shortcut=😃,f=14

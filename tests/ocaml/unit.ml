@@ -10,9 +10,8 @@ let expect ?(msg = "") pp_a got expected =
       expected pp_a got;
     failwith "Test failure")
 
-let create words =
-  let words = List.mapi (fun i w -> (w, i)) words in
-  let w = Cdict_builder.of_list ~name:"main" ~freq:Fun.id words in
+let create' words =
+  let w = Cdict_builder.of_list ~name:"main" ~freq:fst ~alias:snd words in
   let data = Cdict_builder.to_string [ w ] in
   (* Cdict_builder.stats Format.err_formatter w; *)
   (* Hxd_string.pp Hxd.default Format.err_formatter data; *)
@@ -22,6 +21,8 @@ let create words =
   expect Format.pp_print_string (fst cdict_header.(0)) "main";
   snd cdict_header.(0)
 
+let create words = create' (List.mapi (fun i w -> (w, (i, None))) words)
+
 let pp_leaf_opt ppf = function
   | Some leaf -> fpf ppf "%d" leaf
   | None -> fpf ppf "<not found>"
@@ -29,7 +30,11 @@ let pp_leaf_opt ppf = function
 let pp_word_leaf_opt ppf (w, l) = fpf ppf "%s %a" w pp_leaf_opt l
 let pp_list fmt = Format.(pp_print_list ~pp_sep:pp_print_space) fmt
 
-let find d word =
+let find_no_assert d word =
+  let r = Cdict.find d word in
+  if r.found then Some (Cdict.freq d r.index) else None
+
+let find_assert d word =
   let r = Cdict.find d word in
   if r.found then (
     expect ~msg:"Retrieve word" Format.pp_print_string (Cdict.word d r.index)
@@ -38,18 +43,25 @@ let find d word =
   else None
 
 let assert_found d word expected_leaf =
-  expect ~msg:"Find returned unexpected value. " pp_leaf_opt (find d word)
+  expect ~msg:"Find returned unexpected value. " pp_leaf_opt (find_assert d word)
     (Some expected_leaf)
 
-let create_and_assert words =
-  let d = create words in
+let create_and_assert' words =
+  let d = create' (List.map fst words) in
   expect ~msg:"create_and_assert. " (pp_list pp_word_leaf_opt)
-    (List.map (fun w -> (w, find d w)) words)
-    (List.mapi (fun i w -> (w, Some i)) words);
+    (List.map (fun ((w, _), _) -> (w, find_no_assert d w)) words)
+    (List.map (fun ((w, _), r) -> (w, Some r)) words);
   d
 
+let create_and_assert words =
+  create_and_assert' (List.mapi (fun i w -> ((w, (i, None)), i)) words)
+
+let create_and_assert_with_aliases words =
+  create_and_assert'
+    (List.mapi (fun i (w, alias, r) -> ((w, (i, alias)), r)) words)
+
 let assert_not_found d word =
-  match find d word with
+  match find_assert d word with
   | Some leaf -> fail "Expected not found but got %d for word %S" leaf word
   | None -> ()
 
@@ -101,3 +113,17 @@ let () =
   match Cdict.of_string "Dic\xFF" with
   | exception Failure "Unsupported format" -> ()
   | _ -> assert false
+
+(* Aliases *)
+let () =
+  let _ =
+    create_and_assert_with_aliases
+      [
+        ("abc", Some "Abc", 1);
+        ("Abc", None, 1);
+        ("Def", None, 2);
+        ("def", Some "Def", 2);
+        ("ghi", None, 4);
+      ]
+  in
+  ()

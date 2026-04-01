@@ -46,7 +46,11 @@ void cdict_get_dict(cdict_header_t const *header, int i, cdict_t *dst)
   *dst = (cdict_t){
     .name = data + decode_int32(dh->name_off),
     .root_node = data + decode_int32(dh->root_ptr),
-    .freq = data + decode_int32(dh->freq_off)
+    .freq = data + decode_int32(dh->freq_off),
+    .aliases_header = dh->aliases_header,
+    .aliases_length = decode_int24(dh->aliases_length),
+    .aliases_keys = data + decode_int32(dh->aliases_keys),
+    .aliases_values = data + decode_int32(dh->aliases_values),
   };
 }
 
@@ -62,6 +66,40 @@ char const* cdict_cnstr_result_to_string(cdict_cnstr_result_t r)
 }
 
 int cdict_format_version() { return FORMAT_VERSION; }
+
+/** ************************************************************************
+    Aliases
+    ************************************************************************ */
+
+/** Search for [key] in the complete tree encoded in array [ar] with format
+    [fmt] and length [length]. Return [-1] if the key is not found. */
+static int complete_tree_search_unsigned(uint8_t const *ar, format_t fmt,
+    unsigned int length, unsigned int key)
+{
+  unsigned int i = 0;
+  while (i < length)
+  {
+    unsigned int ar_i = sized_int_array_unsigned(ar, fmt, i);
+    if (ar_i == key)
+      return i;
+    i = i * 2 + ((key < ar_i) ? 1 : 2);
+  }
+  return -1;
+}
+
+static void resolve_alias(cdict_t const *dict, cdict_result_t *result)
+{
+  if (dict->aliases_length == 0)
+    return;
+  int i =
+    complete_tree_search_unsigned(dict->aliases_keys,
+        ALIASES_KEY_FORMAT(dict), dict->aliases_length, result->index);
+  if (i < 0)
+    return;
+  result->index =
+    sized_int_array_unsigned(dict->aliases_values,
+        ALIASES_VALUES_FORMAT(dict), i);
+}
 
 /** ************************************************************************
     cdict_find
@@ -145,6 +183,8 @@ void cdict_find(cdict_t const *dict, char const *word, int word_size,
   *result = RESULT_T_INIT;
   cdict_find_node(dict->root_node, 0, word, word + word_size, 0,
       result);
+  if (result->found)
+    resolve_alias(dict, result);
 }
 
 /** ************************************************************************

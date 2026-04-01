@@ -31,8 +31,13 @@ val set : t -> int -> int -> unit
 
 val format : t -> format
 
-val size : t -> int
+val size_bytes : t -> int
 (** Size of the array in bytes. *)
+
+val length : t -> int
+(** Number of elements in the array. For arrays of 4-bits integers, the returned
+    length might be one more than the number of elements specified during
+    creation. *)
 
 val format_to_string : format -> string
 val detect_format : ?signed:bool -> int array -> format
