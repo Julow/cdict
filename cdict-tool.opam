@@ -7,6 +7,8 @@ depends: [
   "menhir"
   "cdict"
   "astring"
+  "bytesrw"
+  "jsont"
   "odoc" {with-doc}
 ]
 build: [
