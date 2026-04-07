@@ -87,17 +87,17 @@ static int complete_tree_search_unsigned(uint8_t const *ar, format_t fmt,
   return -1;
 }
 
-static void resolve_alias(cdict_t const *dict, cdict_result_t *result)
+/** Return the new index if an alias exists or [-1]. */
+static int resolve_alias(cdict_t const *dict, int index)
 {
   if (dict->aliases_length == 0)
-    return;
+    return -1;
   int i =
     complete_tree_search_unsigned(dict->aliases_keys,
-        ALIASES_KEY_FORMAT(dict), dict->aliases_length, result->index);
+        ALIASES_KEY_FORMAT(dict), dict->aliases_length, index);
   if (i < 0)
-    return;
-  result->index =
-    sized_int_array_unsigned(dict->aliases_values,
+    return -1;
+  return sized_int_array_unsigned(dict->aliases_values,
         ALIASES_VALUES_FORMAT(dict), i);
 }
 
@@ -184,7 +184,11 @@ void cdict_find(cdict_t const *dict, char const *word, int word_size,
   cdict_find_node(dict->root_node, 0, word, word + word_size, 0,
       result);
   if (result->found)
-    resolve_alias(dict, result);
+  {
+    int alias = resolve_alias(dict, result->index);
+    if (alias >= 0)
+      result->index = alias;
+  }
 }
 
 /** ************************************************************************
@@ -364,6 +368,16 @@ static void priority_add(priority_t *p, int freq, int index)
   q[i] = new;
 }
 
+/** Resole aliases and call [priority_add]. */
+static void priority_add_resolved(cdict_t const *dict, priority_t *dst,
+    int index)
+{
+  int alias = resolve_alias(dict, index);
+  if (alias >= 0)
+    index = alias;
+  priority_add(dst, cdict_freq(dict, index), index);
+}
+
 /** ************************************************************************
     cdict_suffixes
     ************************************************************************ */
@@ -385,7 +399,7 @@ static void suffixes(cdict_t const *dict, void const *parent_node, int ptr,
   void const *node = PTR_NODE(ptr, parent_node);
   if (PTR_IS_FINAL(ptr))
   {
-    priority_add(dst, cdict_freq(dict, index), index);
+    priority_add_resolved(dict, dst, index);
     index++;
   }
   switch (NODE_KIND(node))
@@ -499,7 +513,7 @@ static void distance(cdict_t const *dict, void const *parent_node, int ptr,
     cdict_result_t r = RESULT_T_INIT;
     cdict_find_node(parent_node, ptr, word, end, index, &r);
     if (r.found)
-      priority_add(q, cdict_freq(dict, r.index), r.index);
+      priority_add_resolved(dict, q, r.index);
     return;
   }
   void const *node = PTR_NODE(ptr, parent_node);

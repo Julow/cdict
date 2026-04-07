@@ -23,16 +23,16 @@
   close match: "dictionary" distance=2 freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   found: "dictionary" freq=0 index=2
-  close match: "dctnr" distance=2 freq=0 index=1
-  close match: "dctnr" distance=2 freq=0 index=1
+  close match: "dictionary" distance=2 freq=0 index=2
+  close match: "dictionary" distance=2 freq=0 index=2
   not found: "dctionary"
   close match: "dictionary" distance=1 freq=0 index=2
   found: "dictionary" freq=0 index=2
-  close match: "dctnr" distance=2 freq=0 index=1
-  close match: "dctnr" distance=2 freq=0 index=1
+  close match: "dictionary" distance=2 freq=0 index=2
+  close match: "dictionary" distance=2 freq=0 index=2
   not found: "unexpected"
   close match: "Unexpected" distance=1 freq=0 index=0
   close match: "Unexpected" distance=2 freq=0 index=0
   found: "Unexpected" freq=0 index=0
-  close match: "nxpctd" distance=2 freq=0 index=3
+  close match: "Unexpected" distance=2 freq=0 index=0
   [3]
