@@ -33,6 +33,7 @@
 
   $ cdict-tool query dict sour heuxeux
   not found: "sour"
+  prefix: "\240\159\152\128" freq=0 index=5
   close match: "\240\159\152\128" distance=1 freq=0 index=5
   not found: "heuxeux"
   close match: "\240\159\152\132" distance=1 freq=0 index=8

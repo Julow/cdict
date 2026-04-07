@@ -131,13 +131,12 @@ static void cdict_find_branches(branches_t const *b,
   }
 }
 
-static void find_ends(void const *parent_node, int ptr, int index, bool found,
+static void find_ends(intptr_t prefix_ptr, int index, bool found,
     cdict_result_t *result)
 {
-  void const *node = PTR_NODE(ptr, parent_node);
-  result->found = found && (bool)PTR_IS_FINAL(ptr);
+  result->found = found;
   result->index = index;
-  result->prefix_ptr = PREFIX_PTR(node);
+  result->prefix_ptr = prefix_ptr;
 }
 
 static void cdict_find_prefix(prefix_t const *node,
@@ -153,18 +152,19 @@ static void cdict_find_prefix(prefix_t const *node,
     if (prefix == prefix_end) // Prefix matches
       return cdict_find_node(node, next_ptr, word, end, index, result);
     if (word == end) // Query ends
-      return find_ends(node, next_ptr, index, false, result);
+      return find_ends(PREFIX_PTR_OF_PTR(next_ptr, node), index, false, result);
   }
 }
 
 static void cdict_find_node(void const *parent_node, int ptr,
     char const *word, char const *end, int index, cdict_result_t *result)
 {
-  if (word == end)
-    return find_ends(parent_node, ptr, index, true, result);
-  if (PTR_IS_FINAL(ptr))
-    index++;
+  bool is_final = PTR_IS_FINAL(ptr);
   void const *node = PTR_NODE(ptr, parent_node);
+  if (word == end)
+    return find_ends(PREFIX_PTR_OF_NODE(node), index, is_final, result);
+  if (is_final)
+    index++;
   switch (NODE_KIND(node))
   {
     case BRANCHES:
@@ -422,7 +422,8 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
   word_freq_t words[count];
   priority_t queue;
   priority_init(&queue, words, count);
-  suffixes(dict, PREFIX_PTR_NODE(r->prefix_ptr), 0, r->index, &queue);
+  suffixes(dict, PREFIX_PTR_PARENT(r->prefix_ptr),
+      PREFIX_PTR_PTR(r->prefix_ptr), r->index, &queue);
   return priority_to_sorted_array(&queue, dst, count);
 }
 
