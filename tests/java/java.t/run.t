@@ -93,6 +93,7 @@
 
   $ java -cp cdict_java.jar -Djava.library.path=$PWD juloo.cdict.tests/CdictJavaTests.java -- dict overload enum defensive coding
   not found: overload
+  prefix: overloading freq=0 index=5830
   close match: overloading distance=1 freq=0
   close match: overhead distance=2 freq=9
   close match: overlap distance=2 freq=7

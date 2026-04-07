@@ -84,6 +84,7 @@
 
   $ cdict-tool query dict overload enum defensive coding
   not found: "overload"
+  prefix: "overloading" freq=0 index=5830
   close match: "overloading" distance=1 freq=0 index=5830
   close match: "overhead" distance=2 freq=9 index=5826
   close match: "overlap" distance=2 freq=7 index=5827

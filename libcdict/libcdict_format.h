@@ -171,8 +171,12 @@ It is exposed in 'cdict_result_t' but not used outside of the library.
 'prefix_ptr' can be NULL.
 */
 
-#define PREFIX_PTR_NODE(P) ((void const*)(P))
-#define PREFIX_PTR(NODE) ((intptr_t)(NODE))
+#define PREFIX_PTR_PARENT(P) ((void const*)((P) & PTR_OFFSET_MASK))
+#define PREFIX_PTR_PTR(P) ((int)((P) & ~PTR_OFFSET_MASK))
+#define PREFIX_PTR_IS_FINAL(P) PTR_IS_FINAL(P)
+#define PREFIX_PTR_OF_NODE(NODE) ((intptr_t)(NODE))
+#define PREFIX_PTR_OF_PTR(PTR, PARENT_NODE) \
+  (((intptr_t)(PARENT_NODE)) + (int)(PTR))
 
 /** Dictionary header (size = 8 bytes)
 
