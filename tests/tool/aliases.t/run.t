@@ -38,3 +38,24 @@
   not found: "heuxeux"
   close match: "\240\159\152\132" distance=1 freq=0 index=8
   [2]
+
+The combination of substitutions and shortcuts creates alias chains:
+(eg. sorire -> sourire -> 😀)
+
+  $ cdict-tool build -s subst.json -o subst.dict main:words.combined
+  Parsing "words.combined"
+  Built dictionary "main" (6 words)
+  Done.
+
+  $ cdict-tool query subst.dict so
+  not found: "so"
+  prefix: "\240\159\152\128" freq=0 index=7
+  prefix: "\240\159\152\128" freq=0 index=7
+  close match: "\240\159\152\128" distance=1 freq=0 index=7
+  close match: "\240\159\152\128" distance=1 freq=0 index=7
+  close match: "\240\159\152\128" distance=2 freq=0 index=7
+  close match: "\240\159\152\128" distance=2 freq=0 index=7
+  close match: "\240\159\152\131" distance=2 freq=0 index=9
+  close match: "\240\159\152\131" distance=2 freq=0 index=9
+  close match: "\240\159\152\132" distance=2 freq=0 index=10
+  [1]
