@@ -18,3 +18,8 @@ dictionary=Emojis:fr,description=Emojis pour mots Français,locale=fr,date=16897
  word=haha,f=14,not_a_word=true
   shortcut=😆,f=14
   shortcut=😃,f=14
+ word=sourire_en_sueur,f=14,not_a_word=true
+  shortcut=😅,f=14
+ word=souris,f=14,not_a_word=true
+  shortcut=🐭,f=14
+  shortcut=🐁,f=14
