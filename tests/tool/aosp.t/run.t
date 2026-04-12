@@ -57,6 +57,7 @@
   close match: "function" distance=2 freq=15 index=4302
   found: "value" freq=15 index=7722
   prefix: "value" freq=15 index=7722
+  prefix: "values" freq=15 index=7724
   prefix: "valuerestriction" freq=0 index=7723
   close match: "values" distance=1 freq=15 index=7724
   close match: "Value" distance=1 freq=8 index=2185
@@ -71,6 +72,7 @@
   prefix: "matching" freq=15 index=5270
   prefix: "matched" freq=14 index=5268
   prefix: "matches" freq=14 index=5269
+  prefix: "matchings" freq=11 index=5271
   close match: "matching" distance=1 freq=15 index=5270
   close match: "Match" distance=1 freq=14 index=1428
   close match: "matched" distance=1 freq=14 index=5268

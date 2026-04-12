@@ -18,6 +18,7 @@ TODO: Some words are not found back due to some encoding issues.
   found: "foo" freq=15 index=4223
   prefix: "foo" freq=15 index=4223
   prefix: "fooBar" freq=7 index=4224
+  prefix: "footnote" freq=7 index=4225
   close match: "for" distance=1 freq=15 index=4226
   close match: "Foo" distance=1 freq=13 index=1040
   close match: "too" distance=1 freq=13 index=7409
@@ -30,4 +31,5 @@ TODO: Some words are not found back due to some encoding issues.
   close match: "do" distance=2 freq=15 index=3678
   $ cdict-tool query -d second dict foo
   found: "foo" freq=0 index=2
+  prefix: "foo" freq=0 index=2
   close match: "foo" distance=2 freq=0 index=2

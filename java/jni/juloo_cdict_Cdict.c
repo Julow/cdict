@@ -24,6 +24,7 @@ static struct
   jfieldID found;
   jfieldID index;
   jfieldID prefix_ptr;
+  jfieldID original_index;
 } Result;
 
 static jobject result_to_java(JNIEnv *env, cdict_result_t const *result)
@@ -33,6 +34,8 @@ static jobject result_to_java(JNIEnv *env, cdict_result_t const *result)
   (*env)->SetIntField(env, jresult, Result.index, result->index);
   (*env)->SetLongField(env, jresult, Result.prefix_ptr,
       (jlong)result->prefix_ptr);
+  (*env)->SetIntField(env, jresult, Result.original_index,
+      result->original_index);
   return jresult;
 }
 
@@ -41,6 +44,7 @@ static void result_of_java(JNIEnv *env, jobject jresult, cdict_result_t *dst)
   dst->found = (*env)->GetBooleanField(env, jresult, Result.found);
   dst->index = (*env)->GetIntField(env, jresult, Result.index);
   dst->prefix_ptr = (*env)->GetLongField(env, jresult, Result.prefix_ptr);
+  dst->original_index = (*env)->GetIntField(env, jresult, Result.original_index);
 }
 
 static jarray jarray_of_int_array(JNIEnv *env, int const *src, int len)
@@ -76,6 +80,7 @@ JNIEXPORT void JNICALL Java_juloo_cdict_Cdict_init(JNIEnv *env, jclass jcls)
   Result.found = (*env)->GetFieldID(env, Result.class, "found", "Z");
   Result.index = (*env)->GetFieldID(env, Result.class, "index", "I");
   Result.prefix_ptr = (*env)->GetFieldID(env, Result.class, "prefix_ptr", "J");
+  Result.original_index = (*env)->GetFieldID(env, Result.class, "original_index", "I");
 }
 
 JNIEXPORT jlong JNICALL Java_juloo_cdict_Cdict_of_1bytes_1native

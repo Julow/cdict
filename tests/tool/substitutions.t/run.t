@@ -5,9 +5,11 @@
 
   $ cdict-tool query dict --from-file wordlist
   found: "dictionary" freq=0 index=2
+  prefix: "dictionary" freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   found: "Unexpected" freq=0 index=0
+  prefix: "Unexpected" freq=0 index=0
   close match: "Unexpected" distance=2 freq=0 index=0
 
   $ cdict-tool query dict Dictionary
@@ -23,16 +25,19 @@
   close match: "dictionary" distance=2 freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   found: "dictionary" freq=0 index=2
+  prefix: "dictionary" freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   not found: "dctionary"
   close match: "dictionary" distance=1 freq=0 index=2
   found: "dictionary" freq=0 index=2
+  prefix: "dictionary" freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   close match: "dictionary" distance=2 freq=0 index=2
   not found: "unexpected"
   close match: "Unexpected" distance=1 freq=0 index=0
   close match: "Unexpected" distance=2 freq=0 index=0
   found: "Unexpected" freq=0 index=0
+  prefix: "Unexpected" freq=0 index=0
   close match: "Unexpected" distance=2 freq=0 index=0
   [3]
