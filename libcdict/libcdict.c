@@ -497,9 +497,10 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   {
     if (pdist + 1 == dist)
       return suffixes(dict, p, next_ptr, index, q);
+    pdist += len - word_len;
   }
   int next_dist = dist - pdist;
-  for (int i = len; i >= 0 && next_dist >= 0; i--)
+  for (int i = common_len; i >= 0 && next_dist >= 0; i--)
   {
     // Add suffixes of 'p', including the empty suffix.
     distance(dict, p, next_ptr, word + i, end, index, next_dist, q);

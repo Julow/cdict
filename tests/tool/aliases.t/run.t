@@ -58,8 +58,19 @@ suffixes() must use the original trie index, not the alias-resolved index.
   close match: "\240\159\152\128" distance=2 freq=0 index=9
 
   $ cdict-tool query dict sour heuxeux
-  41050 Segmentation fault         (core dumped) cdict-tool query dict sour heuxeux
-  [139]
+  not found: "sour"
+  prefix: "\240\159\144\173" freq=0 index=8
+  prefix: "\240\159\152\128" freq=0 index=9
+  prefix: "\240\159\152\133" freq=0 index=13
+  close match: "\240\159\144\173" distance=1 freq=0 index=8
+  close match: "\240\159\152\128" distance=1 freq=0 index=9
+  close match: "\240\159\152\133" distance=1 freq=0 index=13
+  close match: "\240\159\144\173" distance=2 freq=0 index=8
+  close match: "\240\159\152\128" distance=2 freq=0 index=9
+  close match: "\240\159\152\133" distance=2 freq=0 index=13
+  not found: "heuxeux"
+  close match: "\240\159\152\132" distance=1 freq=0 index=12
+  [2]
 
 The combination of substitutions and shortcuts creates alias chains:
 (eg. sorire -> sourire -> 😀)
