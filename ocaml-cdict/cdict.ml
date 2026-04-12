@@ -8,8 +8,8 @@ type result = {
   index : index;
       (** Unique index of the word, can be used to lookup word metadata. *)
   prefix_node : node;
-  prefix_node_ptr : ptr;
       (** Internal pointer used to list words starting with a prefix. *)
+  original_index : index;  (** Index before alias resolution. *)
 }
 
 external of_string : string -> (string * t) array = "cdict_of_string_ocaml"

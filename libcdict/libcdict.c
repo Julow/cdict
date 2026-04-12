@@ -137,6 +137,7 @@ static void find_ends(intptr_t prefix_ptr, int index, bool found,
   result->found = found;
   result->index = index;
   result->prefix_ptr = prefix_ptr;
+  result->original_index = index;
 }
 
 static void cdict_find_prefix(prefix_t const *node,
@@ -152,7 +153,7 @@ static void cdict_find_prefix(prefix_t const *node,
     if (prefix == prefix_end) // Prefix matches
       return cdict_find_node(node, next_ptr, word, end, index, result);
     if (word == end) // Query ends
-      return find_ends(PREFIX_PTR_OF_PTR(next_ptr, node), index, false, result);
+      return find_ends(PREFIX_PTR(next_ptr, node), index, false, result);
   }
 }
 
@@ -162,7 +163,7 @@ static void cdict_find_node(void const *parent_node, int ptr,
   bool is_final = PTR_IS_FINAL(ptr);
   void const *node = PTR_NODE(ptr, parent_node);
   if (word == end)
-    return find_ends(PREFIX_PTR_OF_NODE(node), index, is_final, result);
+    return find_ends(PREFIX_PTR(ptr, parent_node), index, is_final, result);
   if (is_final)
     index++;
   switch (NODE_KIND(node))
@@ -175,7 +176,7 @@ static void cdict_find_node(void const *parent_node, int ptr,
 }
 
 #define RESULT_T_INIT ((cdict_result_t){ \
-    .found = false, .index = 0, .prefix_ptr = 0 })
+    .found = false, .index = 0, .prefix_ptr = 0, .original_index = 0 })
 
 void cdict_find(cdict_t const *dict, char const *word, int word_size,
     cdict_result_t *result)
@@ -423,7 +424,7 @@ int cdict_suffixes(cdict_t const *dict, cdict_result_t const *r, int *dst,
   priority_t queue;
   priority_init(&queue, words, count);
   suffixes(dict, PREFIX_PTR_PARENT(r->prefix_ptr),
-      PREFIX_PTR_PTR(r->prefix_ptr), r->index, &queue);
+      PREFIX_PTR_PTR(r->prefix_ptr), r->original_index, &queue);
   return priority_to_sorted_array(&queue, dst, count);
 }
 
@@ -496,9 +497,10 @@ static void distance_prefix(cdict_t const *dict, prefix_t const *p,
   {
     if (pdist + 1 == dist)
       return suffixes(dict, p, next_ptr, index, q);
+    pdist += len - word_len;
   }
   int next_dist = dist - pdist;
-  for (int i = len; i >= 0 && next_dist >= 0; i--)
+  for (int i = common_len; i >= 0 && next_dist >= 0; i--)
   {
     // Add suffixes of 'p', including the empty suffix.
     distance(dict, p, next_ptr, word + i, end, index, next_dist, q);

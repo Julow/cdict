@@ -12,10 +12,12 @@ public class Cdict
     public final int index;
     /** Internal pointer used by the suffixes function. */
     public final long prefix_ptr;
+    /** Index before alias resolution. Used internally. */
+    public final int original_index;
 
     // Constructed from C code.
     private Result()
-    { found = false; index = -1; prefix_ptr = 0; }
+    { found = false; index = -1; prefix_ptr = 0; original_index = -1; }
   }
 
   /** Dictionary name. */

@@ -61,6 +61,8 @@ typedef struct
   /** Internal node where the search stopped. Use [cdict_suffixes] to list
       the words starting with this prefix. Might be [0], in which case the
       queried is not the prefix of any word in the dictionary. */
+  int original_index;
+  /** Index of the recognized word before alias resolution. Used internally. */
 } cdict_result_t;
 
 /** Lookup the given word of the given size in the dictionary.
