@@ -43,8 +43,8 @@ let find_assert d word =
   else None
 
 let assert_found d word expected_leaf =
-  expect ~msg:"Find returned unexpected value. " pp_leaf_opt (find_assert d word)
-    (Some expected_leaf)
+  expect ~msg:"Find returned unexpected value. " pp_leaf_opt
+    (find_assert d word) (Some expected_leaf)
 
 let create_and_assert' words =
   let d = create' (List.map fst words) in

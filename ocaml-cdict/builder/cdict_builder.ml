@@ -197,7 +197,6 @@ module Aliases = struct
     let ar = Dynarray.to_array ar |> Complete_tree.of_sorted_array in
     let mk_sized f = Sized_int_array.mk_detect ~signed:false (Array.map f ar) in
     { keys = mk_sized fst; values = mk_sized snd; length = Array.length ar }
-
 end
 
 type 'a t = {

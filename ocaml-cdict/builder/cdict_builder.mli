@@ -13,11 +13,11 @@ val of_list :
   'a t
 (** Construct a dictionary from a list.
 
-    If [alias w1] returns [Some w2], [w1] is not a proper word in the
-    dictionary but instead an alias to [w2]. The alias dictionary is an extra
-    dictionary, named [name ^ ".alias"], that specifies whether a word is an
-    alias to an other word. It is not created if [alias] returns [None] for
-    every words in the list (the default). *)
+    If [alias w1] returns [Some w2], [w1] is not a proper word in the dictionary
+    but instead an alias to [w2]. The alias dictionary is an extra dictionary,
+    named [name ^ ".alias"], that specifies whether a word is an alias to an
+    other word. It is not created if [alias] returns [None] for every words in
+    the list (the default). *)
 
 val output : 'a t list -> Out_channel.t -> unit
 (** Write a dictionary file containing a list of dictionaries into the given
