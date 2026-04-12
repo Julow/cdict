@@ -183,15 +183,21 @@ module Aliases = struct
     let input_length = Array.length words in
     let ar = Dynarray.create () in
     let search w = bsearch words (fun (w', _) -> String.compare w w') in
+    let rec resolve w =
+      match search w with
+      | Some i as r -> (
+          match alias (snd words.(i)) with Some w' -> resolve w' | None -> r)
+      | None -> None
+    in
     for i = 0 to input_length - 1 do
-      let _, data = words.(i) in
-      match Option.bind (alias data) search with
+      match Option.bind (alias (snd words.(i))) resolve with
       | Some i2 -> Dynarray.add_last ar (i, i2)
       | None -> ()
     done;
     let ar = Dynarray.to_array ar |> Complete_tree.of_sorted_array in
     let mk_sized f = Sized_int_array.mk_detect ~signed:false (Array.map f ar) in
     { keys = mk_sized fst; values = mk_sized snd; length = Array.length ar }
+
 end
 
 type 'a t = {
