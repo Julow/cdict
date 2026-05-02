@@ -18,3 +18,7 @@ This project contains several things:
 
 - `cdict-tool` An OCaml program for constructing dictionaries with support for
   AOSP word lists.
+
+## Acknowledgment
+
+This work was funded by the [NLnet foundation](https://nlnet.nl/). Thank you!
