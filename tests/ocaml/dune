@@ -1,4 +1,4 @@
 (tests
- (names unit complete_tree k_medians sized_int_array)
+ (names unit complete_tree freq sized_int_array)
  (package cdict)
  (libraries cdict cdict.builder))

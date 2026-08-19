@@ -48,9 +48,11 @@ let assert_found d word expected_leaf =
 
 let create_and_assert' words =
   let d = create' (List.map fst words) in
+  let n = List.length words in
+  let enc = Cdict_builder.Freq.of_int_array (Array.init n Fun.id) in
   expect ~msg:"create_and_assert. " (pp_list pp_word_leaf_opt)
     (List.map (fun ((w, _), _) -> (w, find_no_assert d w)) words)
-    (List.map (fun ((w, _), r) -> (w, Some r)) words);
+    (List.map (fun ((w, _), r) -> (w, Some (Cdict_builder.Freq.get enc r))) words);
   d
 
 let create_and_assert words =
