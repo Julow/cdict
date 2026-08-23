@@ -98,8 +98,8 @@ module Optimized = struct
 end
 
 module Freq : sig
-  (** Encode an array of frequency into a 4 bits integer array using linear
-      interpolation, losing precision. *)
+  (** Encode an array of frequency into a 4 bits integer array using
+      logarithmic partitioning, losing precision. *)
 
   type t = private string
 
@@ -117,28 +117,32 @@ module Freq : sig
 end = struct
   type t = string
 
-  let of_int_array_raw freq =
-    let len = Array.length freq in
-    let s = Bytes.create ((len + 1) / 2) in
-    for f_i = 0 to len - 1 do
+  let buckets = 0x10
+
+  let make length f =
+    let s = Bytes.create ((length + 1) / 2) in
+    for f_i = 0 to length - 1 do
       let s_i = f_i / 2 in
-      let f =
-        let f = freq.(f_i) land 0xF in
-        if f_i land 1 = 0 then f else (f lsl 4) lor Bytes.get_uint8 s s_i
+      let freq =
+        let freq = f f_i land 0xF in
+        if f_i land 1 = 0 then freq else (freq lsl 4) lor Bytes.get_uint8 s s_i
       in
-      Bytes.set_uint8 s s_i f
+      Bytes.set_uint8 s s_i freq
     done;
     Bytes.unsafe_to_string s
 
   let of_int_array freq =
-    let freq_compressed =
-      (* Compute the 0x10 medians and replace every frequencies by the cluster
-         index they are assigned to. This compresses frequencies to a 4-bits
-         number by loosing information. *)
-      K_medians.k_medians freq 0x10 ~compare:Int.compare ~renumber:(fun _ c ->
-          c)
-    in
-    of_int_array_raw freq_compressed
+    (* Cluster frequencies into [buckets] buckets using a logarithmic
+       scale. This compresses frequencies to a 4-bits number by loosing
+       information. This works well for dictionaries with many infrequent words
+       and few frequent ones. *)
+    let log_ n = log (1. +. float n) in
+    let min_freq = Array.fold_left min max_int freq in
+    let max_log = log_ (Array.fold_left max 0 freq - min_freq) in
+    let scale = float (buckets - 1) in
+    let bucket i = int_of_float (log_ (freq.(i) - min_freq) *. scale /. max_log) in
+    let bucket = if max_log <= 0. then (fun _ -> 0) else bucket in
+    make (Array.length freq) bucket
 
   let size = String.length
 
@@ -488,5 +492,4 @@ let pp ppf { name = _; dfa = nodes, root_id; freq; aliases = _ } =
   pp freq nodes 0 ppf root_id
 
 module Complete_tree = Complete_tree
-module K_medians = K_medians
 module Sized_int_array = Sized_int_array

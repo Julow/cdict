@@ -42,13 +42,13 @@ module Complete_tree : sig
   val to_array : 'a t -> 'a array
 end
 
-module K_medians : sig
-  val k_medians :
-    'a array ->
-    int ->
-    compare:('a -> 'a -> int) ->
-    renumber:('a -> int -> 'b) ->
-    'b array
+module Freq : sig
+  type t = private string
+
+  val of_int_array : int array -> t
+  val size : t -> int
+  val get : t -> int -> int
+  val to_int_list : t -> int list
 end
 
 module Sized_int_array : module type of Sized_int_array
