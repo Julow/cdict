@@ -8,6 +8,7 @@ homepage: "https://github.com/Julow/cdict"
 bug-reports: "https://github.com/Julow/cdict/issues"
 depends: [
   "dune" {>= "3.13"}
+  "ocaml" {>= "5.2"}
   "dfa"
   "odoc" {with-doc}
 ]

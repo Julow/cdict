@@ -20,7 +20,10 @@
 (package
  (name cdict)
  (synopsis "Compact dictionary partially written in C for spell checking")
- (depends dfa))
+ (depends
+  (ocaml
+   (>= 5.2))
+  dfa))
 
 (package
  (name cdict-tool)
