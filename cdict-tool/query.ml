@@ -11,9 +11,9 @@ let queries_from_file = function
 let query_distance dict ~dist q =
   Cdict.distance dict q ~dist ~count:5
   |> Array.iter (fun idx ->
-         Printf.printf "close match: %S distance=%d freq=%d index=%d\n"
-           (Cdict.word dict idx) dist (Cdict.freq dict idx)
-           (idx :> int))
+      Printf.printf "close match: %S distance=%d freq=%d index=%d\n"
+        (Cdict.word dict idx) dist (Cdict.freq dict idx)
+        (idx :> int))
 
 let print_result_and_suggestions dict q r =
   if r.Cdict.found then
@@ -37,7 +37,7 @@ let query ~quiet ~subst dict q =
     print_result_and_suggestions dict q r;
     Substitutions.apply subst q
     |> List.iter (fun q' ->
-           print_result_and_suggestions dict q' (Cdict.find dict q')));
+        print_result_and_suggestions dict q' (Cdict.find dict q')));
   if r.found then 0 else 1
 
 let main quiet from_file dict_name subst dict_fname queries =
