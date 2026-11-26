@@ -31,9 +31,7 @@ let () =
     Array.iter (fun (_, b) -> assert (b >= 0 && b <= 0xF)) r;
     (* Check that the order is preserved. *)
     Array.sort (fun (a, _) (b, _) -> compare a b) r;
-    Array.iteri
-      (fun i (_, b) -> if i > 0 then assert (b >= snd r.(i - 1)))
-      r
+    Array.iteri (fun i (_, b) -> if i > 0 then assert (b >= snd r.(i - 1))) r
   done
 
 let () = expect' (partition [||]) [||]

@@ -98,8 +98,8 @@ module Optimized = struct
 end
 
 module Freq : sig
-  (** Encode an array of frequency into a 4 bits integer array using
-      logarithmic partitioning, losing precision. *)
+  (** Encode an array of frequency into a 4 bits integer array using logarithmic
+      partitioning, losing precision. *)
 
   type t = private string
 
@@ -140,8 +140,10 @@ end = struct
     let min_freq = Array.fold_left min max_int freq in
     let max_log = log_ (Array.fold_left max 0 freq - min_freq) in
     let scale = float (buckets - 1) in
-    let bucket i = int_of_float (log_ (freq.(i) - min_freq) *. scale /. max_log) in
-    let bucket = if max_log <= 0. then (fun _ -> 0) else bucket in
+    let bucket i =
+      int_of_float (log_ (freq.(i) - min_freq) *. scale /. max_log)
+    in
+    let bucket = if max_log <= 0. then fun _ -> 0 else bucket in
     make (Array.length freq) bucket
 
   let size = String.length
