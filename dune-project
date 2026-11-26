@@ -8,24 +8,36 @@
 
 (generate_opam_files true)
 
+(authors "Jules Aguillon <jules@j3s.fr>")
+
+(maintainers "Jules Aguillon <jules@j3s.fr>")
+
+(license MIT)
+
+(source
+ (github Julow/cdict))
+
 (package
  (name cdict)
- (synopsis "Compact dictionary partially written in C for spell checking.")
- (depends dfa))
+ (synopsis "Compact dictionary partially written in C for spell checking")
+ (depends
+  (ocaml
+   (>= 5.2))
+  dfa))
 
 (package
  (name cdict-tool)
- (synopsis "Compiles dictionaries for the cdict library.")
- (depends cmdliner menhir cdict astring bytesrw jsont))
+ (synopsis "Compiles dictionaries for the cdict library")
+ (depends cmdliner menhir cdict astring bytesrw jsont re))
 
 (package
  (name dfa)
- (synopsis "Construct a minimal DFA that recognizes a list of words.")
+ (synopsis "Construct a minimal DFA that recognizes a list of words")
  (description
   "Implements a minimal deterministic finite-state acyclic automaton that recognizes a finite set of words and perfect hashing. It works with a 8 bits alphabet and treat words as byte strings. It is ideal for natural language dictionaries that are constructed once and compiled into a compact representation."))
 
 (package
  (name cdict-java)
- (synopsis "Internal package.")
+ (synopsis "Internal package")
  (allow_empty)
- (depends cdict))
+ (depends cdict conf-openjdk))
