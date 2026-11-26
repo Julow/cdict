@@ -37,4 +37,4 @@
  (name cdict-java)
  (synopsis "Internal package")
  (allow_empty)
- (depends cdict))
+ (depends cdict conf-openjdk))

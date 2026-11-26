@@ -9,6 +9,7 @@ bug-reports: "https://github.com/Julow/cdict/issues"
 depends: [
   "dune" {>= "3.13"}
   "cdict"
+  "conf-openjdk"
   "odoc" {with-doc}
 ]
 build: [
