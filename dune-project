@@ -25,7 +25,7 @@
 (package
  (name cdict-tool)
  (synopsis "Compiles dictionaries for the cdict library")
- (depends cmdliner menhir cdict astring bytesrw jsont))
+ (depends cmdliner menhir cdict astring bytesrw jsont re))
 
 (package
  (name dfa)
